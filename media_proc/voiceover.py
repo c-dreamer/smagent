@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Voiceover/TTS engine for social media agent.
+
+Converts script text to speech audio using edge-tts.
+"""
+
+import argparse
+import asyncio
+import json
+import os
+import sys
+from typing import List
+
+import edge_tts
+
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PARENT not in sys.path:
+    sys.path.insert(0, _PARENT)
+
+from config import CHANNELS  # noqa: E402
+
+
+def extract_text_from_script(script_path: str) -> str:
+    """Load script JSON and extract voiceover_text from all scenes."""
+    with open(script_path, 'r', encoding='utf-8') as f:
+        script = json.load(f)
+    
+    scenes: List[dict] = script.get('scenes', [])
+    if not scenes:
+        raise ValueError('No scenes found in script')
+    
+    texts = []
+    for scene in scenes:
+        text = scene.get('voiceover_text', '').strip()
+        if text:
+            texts.append(text)
+    
+    if not texts:
+        raise ValueError('No voiceover text found in any scene')
+    
+    # Join with a space to ensure separation between scenes
+    return ' '.join(texts)
+
+
+def get_voice_settings(channel: str) -> tuple[str, str]:
+    """Return (voice, rate) for the given channel based on its tone."""
+    channel_info = CHANNELS.get(channel)
+    if not channel_info:
+        raise ValueError(f'Unknown channel: {channel}')
+    
+    tone = channel_info.tone.lower() if channel_info.tone else ''
+    
+    if channel == 'soccer' or 'energetic' in tone:
+        return 'en-US-ChristopherNeural', '+20%'
+    elif channel == 'christian' or 'reverent' in tone:
+        return 'en-US-JennyNeural', '-10%'
+    elif channel == 'trading' or 'professional' in tone:
+        return 'en-US-GuyNeural', '+0%'
+    else:
+        return 'en-US-GuyNeural', '+0%'
+
+
+async def generate_audio(text: str, voice: str, rate: str, output_path: str) -> None:
+    """Generate audio from text using edge-tts and save to output_path."""
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    await communicate.save(output_path)
+
+
+def validate_audio_file(file_path: str) -> None:
+    """Validate that the audio file exists and has duration > 0 using ffprobe."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f'Audio file not found: {file_path}')
+    
+    # Use ffprobe to get duration
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        duration = float(result.stdout.strip())
+        if duration <= 0:
+            raise ValueError(f'Audio file has zero or negative duration: {duration}')
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f'ffprobe failed: {e.stderr}') from e
+    except ValueError as e:
+        raise ValueError(f'Invalid duration output from ffprobe: {e}') from e
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description='Generate voiceover audio from script or text using edge-tts.'
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        '--script',
+        type=str,
+        help='Path to script JSON file containing scenes with voiceover_text.'
+    )
+    group.add_argument(
+        '--script-text',
+        type=str,
+        help='Raw text to convert to speech directly.'
+    )
+    parser.add_argument(
+        '--channel',
+        type=str,
+        required=True,
+        choices=['soccer', 'christian', 'trading'],
+        help='Channel name to determine voice settings.'
+    )
+    parser.add_argument(
+        '--output',
+        type=str,
+        required=True,
+        help='Output audio file path (MP3).'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine the text to convert
+    if args.script_text is not None:
+        text = args.script_text.strip()
+        if not text:
+            print('Error: --script-text cannot be empty.', file=sys.stderr)
+            sys.exit(1)
+    else:
+        # args.script is provided
+        try:
+            text = extract_text_from_script(args.script)
+        except Exception as e:
+            print(f'Error loading script: {e}', file=sys.stderr)
+            sys.exit(1)
+    
+    # Get voice settings for the channel
+    try:
+        voice, rate = get_voice_settings(args.channel)
+    except ValueError as e:
+        print(f'Error: {e}', file=sys.stderr)
+        sys.exit(1)
+    
+    # Ensure output directory exists
+    output_dir = os.path.dirname(args.output)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Generate audio
+    try:
+        asyncio.run(generate_audio(text, voice, rate, args.output))
+    except Exception as e:
+        print(f'Error generating audio: {e}', file=sys.stderr)
+        sys.exit(1)
+    
+    # Validate the generated audio file
+    try:
+        validate_audio_file(args.output)
+        print(f'Successfully generated audio: {args.output}')
+    except Exception as e:
+        print(f'Error validating audio file: {e}', file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

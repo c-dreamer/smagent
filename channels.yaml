@@ -1,0 +1,32 @@
+soccer:
+  name: GoalHubPro
+  handle: "@Goal_HubPro"
+  channel_id: null
+  niche: soccer analysis and highlights
+  tone: energetic and exciting
+  content_folder: null
+  gdrive_path: null
+  category_id: null
+  playlist_id: null
+
+christian:
+  name: Faith Nexus
+  handle: "@Faith_Nexus"
+  channel_id: null
+  niche: faith and Bible study
+  tone: warm and reverent
+  content_folder: null
+  gdrive_path: null
+  category_id: null
+  playlist_id: null
+
+trading:
+  name: Trading
+  handle: TBD
+  channel_id: null
+  niche: market analysis and trading strategies
+  tone: professional and analytical
+  content_folder: null
+  gdrive_path: null
+  category_id: null
+  playlist_id: null
