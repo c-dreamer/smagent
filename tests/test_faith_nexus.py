@@ -42,7 +42,7 @@ def test_bundle_preflight_requires_all_review_inputs(tmp_path):
     timings = tmp_path / "words.json"
     timings.write_text(json.dumps({"words": [{"text": "x", "start": i, "end": i + 0.1} for i in range(narration_words)]}))
     provenance = tmp_path / "provenance.json"
-    provenance.write_text(json.dumps({"assets": [{"beat_number": index} for index in range(1, 13)]}))
+    provenance.write_text(json.dumps({"assets": [{"beat_number": index, "generated": True} for index in range(1, 13)]}))
     captions = tmp_path / "captions.json"
     captions.write_text(json.dumps({"events": [{"start": 0, "end": 0.1}], "audio_duration": 35.0}))
     assert validate_faith_nexus_bundle(storyboard, timings, provenance, captions)["passed"]

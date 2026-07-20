@@ -57,6 +57,7 @@ def validate_faith_nexus_bundle(storyboard_path: str | Path, timing_path: str | 
         "exact_web_verse": storyboard["evidence"]["verse"]["text"] in storyboard["narration"],
         "timed_every_word": len(timings.get("words", [])) == len(words(storyboard["narration"])),
         "one_visual_per_beat": len(provenance.get("assets", [])) == len(storyboard["visual_beats"]),
+        "generated_visuals": bool(provenance.get("assets")) and all(asset.get("generated") is True for asset in provenance["assets"]),
         "caption_events": bool(captions.get("events")),
         "audio_duration": float(captions.get("audio_duration", 0)) > 0,
     }
