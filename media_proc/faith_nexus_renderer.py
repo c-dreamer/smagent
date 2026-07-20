@@ -51,18 +51,29 @@ def _caption_groups(timings: dict[str, Any]) -> list[dict[str, Any]]:
 def _caption_png(tokens: list[str], active: int, destination: Path) -> None:
     image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    font = _font(66)
-    rendered: list[tuple[str, int]] = []
-    for index, token in enumerate(tokens):
-        width = int(draw.textlength(token, font=font))
-        rendered.append((token, width))
+    font = _font(88)
+    upper = [token.upper() for token in tokens]
     space = int(draw.textlength(" ", font=font))
-    total = sum(width for _, width in rendered) + space * (len(rendered) - 1)
-    x, y = (WIDTH - total) // 2, int(HEIGHT * 0.72)
-    for index, (token, width) in enumerate(rendered):
-        colour = GOLD if index == active else WHITE
-        draw.text((x, y), token, font=font, fill=colour, stroke_width=4, stroke_fill=OUTLINE)
-        x += width + space
+    rows: list[list[tuple[int, str, int]]] = [[]]
+    row_width = 0
+    for index, token in enumerate(upper):
+        width = int(draw.textlength(token, font=font))
+        extra = width if not rows[-1] else width + space
+        if rows[-1] and row_width + extra > 900:
+            rows.append([])
+            row_width = 0
+            extra = width
+        rows[-1].append((index, token, width))
+        row_width += extra
+    y = int(HEIGHT * 0.68)
+    for row in rows:
+        width = sum(item[2] for item in row) + space * (len(row) - 1)
+        x = (WIDTH - width) // 2
+        for index, token, token_width in row:
+            colour = GOLD if index == active else WHITE
+            draw.text((x, y), token, font=font, fill=colour, stroke_width=5, stroke_fill=OUTLINE)
+            x += token_width + space
+        y += 110
     image.save(destination)
 
 
