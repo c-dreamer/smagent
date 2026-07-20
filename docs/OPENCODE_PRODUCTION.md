@@ -36,6 +36,33 @@ untracked `.env` from `.env.example`) before using the NVIDIA provider.
 5. Review reference and candidate frames. Codex may compare quality when available, but is never a dependency.
 6. Complete `examples/faith_nexus_review_template.json`, attach it with `pipeline/approval.py record-quality`, then have a human approve the manifest. Codex may supply comparison notes in that review, but its availability never affects rendering or publishing.
 
+## FaithNexus release contract
+
+Run the channel-specific health check before every production attempt. The
+router must find a healthy YouTube API, Postiz, or Studio provider for the
+`christian` channel and record the selected provider. Never rely on whichever
+YouTube account happens to be open in a browser.
+
+For each candidate, retain an approval-only bundle containing the rendered
+video, storyboard, review manifest, source checksum, exact Bible translation
+and verse, title, caption, hashtags, YouTube tags, intended visibility, and
+`made_for_kids` setting. Compare the candidate against the most recently
+approved reference before seeking approval. A comparison must check the verse
+on screen, caption/verse correspondence, readable captions, 9:16 output, no
+unlicensed asset, and no duplicate source checksum.
+
+Only a human-approved bundle can move to an upload provider. For FaithNexus,
+use public visibility only when the approval explicitly says public. Keep the
+durable publishing ledger intact after failures; it prevents a retry from
+creating a duplicate upload.
+
+Audience experiments alternate one `made_for_kids=false` release followed by
+one `made_for_kids=true` release. Record the cohort, UTC release time, provider
+and resulting YouTube URL. Use Studio Analytics (views, watch time, average
+percentage viewed, likes, comments and subscribers at 24 hours and 7 days) to
+choose a daily publishing window; do not infer a best time from a small sample
+or poll every fifteen minutes.
+
 ## Asset policy
 
 Use ComfyUI API with Flux for keyframes and Wan/LTX for short motion shots, a hosted NVIDIA provider, or licensed stock. `yt-dlp` is a downloader, not a licence: restrict it to your own work, explicitly licensed assets, or written permission. Preserve URL, creator, licence and used timecodes in the manifest.
