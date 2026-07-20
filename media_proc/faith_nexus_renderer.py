@@ -81,7 +81,7 @@ def _caption_png(tokens: list[str], active: int, destination: Path, accent: tupl
         x = (WIDTH - width) // 2
         for index, token, token_width in row:
             colour = accent if index == active else caption
-            draw.text((x, y), token, font=font, fill=colour, stroke_width=5, stroke_fill=OUTLINE)
+            draw.text((x, y), token, font=font, fill=colour, stroke_width=8, stroke_fill=OUTLINE)
             x += token_width + space
         y += 110
     image.save(destination)
