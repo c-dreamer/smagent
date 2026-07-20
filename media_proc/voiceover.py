@@ -20,6 +20,16 @@ if _PARENT not in sys.path:
 
 from config import CHANNELS  # noqa: E402
 
+# Keep experiments controlled: the same script, visuals, captions and music are
+# rendered with one of these named variants. Never A/B test multiple changes at
+# once, or view performance becomes uninterpretable.
+FAITH_NEXUS_VOICE_VARIANTS = {
+    "jenny_warm": ("en-US-JennyNeural", "-10%"),
+    "aria_clear": ("en-US-AriaNeural", "-8%"),
+    "guy_calm": ("en-US-GuyNeural", "-8%"),
+    "andrew_steady": ("en-US-AndrewNeural", "-8%"),
+}
+
 
 def extract_text_from_script(script_path: str) -> str:
     """Load script JSON and extract voiceover_text from all scenes."""
@@ -59,6 +69,16 @@ def get_voice_settings(channel: str) -> tuple[str, str]:
         return 'en-US-GuyNeural', '+0%'
     else:
         return 'en-US-GuyNeural', '+0%'
+
+
+def resolve_voice_settings(channel: str, voice: str | None = None, rate: str | None = None) -> tuple[str, str]:
+    """Resolve a named Faith Nexus test voice or an explicit Edge voice."""
+    default_voice, default_rate = get_voice_settings(channel)
+    if voice and voice in FAITH_NEXUS_VOICE_VARIANTS:
+        default_voice, default_rate = FAITH_NEXUS_VOICE_VARIANTS[voice]
+    elif voice:
+        default_voice = voice
+    return default_voice, rate or default_rate
 
 
 async def generate_audio(text: str, voice: str, rate: str, output_path: str) -> list[dict]:
@@ -130,6 +150,8 @@ def main() -> None:
         help='Channel name to determine voice settings.'
     )
     parser.add_argument('--timings-output', help='JSON destination for exact TTS word boundaries.')
+    parser.add_argument('--voice', help='Named Faith Nexus test variant or explicit Edge TTS voice.')
+    parser.add_argument('--rate', help='Optional Edge TTS rate such as -8% or +0%.')
     parser.add_argument(
         '--output',
         type=str,
@@ -155,7 +177,7 @@ def main() -> None:
     
     # Get voice settings for the channel
     try:
-        voice, rate = get_voice_settings(args.channel)
+        voice, rate = resolve_voice_settings(args.channel, args.voice, args.rate)
     except ValueError as e:
         print(f'Error: {e}', file=sys.stderr)
         sys.exit(1)

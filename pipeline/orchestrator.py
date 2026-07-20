@@ -49,6 +49,8 @@ def run_faith_nexus_storyboard(
     output_dir: str,
     image_provider: str = "comfyui",
     workflow_template: str | None = None,
+    voice: str | None = None,
+    rate: str | None = None,
 ) -> dict:
     """Run the audio-led devotional pipeline; it never uploads or auto-approves."""
     storyboard = load_storyboard(storyboard_path)
@@ -66,7 +68,7 @@ def run_faith_nexus_storyboard(
     voice = _run_module(os.path.join(_PARENT, "media_proc", "voiceover.py"), [
         "--channel", "christian", "--script-text", storyboard["narration"], "--output", str(audio),
         "--timings-output", str(timings),
-    ], "voiceover")
+    ] + (["--voice", voice] if voice else []) + (["--rate", rate] if rate else []), "voiceover")
     states["voiceover"] = voice.model_dump() if hasattr(voice, "model_dump") else voice.dict()
     if voice.status != "completed":
         return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
@@ -331,13 +333,15 @@ def main():
     parser.add_argument("--faith-storyboard", help="Run the audio-led Faith Nexus image-film from a validated storyboard JSON")
     parser.add_argument("--faith-image-provider", choices=["comfyui", "pexels"], default="comfyui")
     parser.add_argument("--comfy-workflow-template", help="ComfyUI API workflow JSON containing {{PROMPT}}")
+    parser.add_argument("--faith-voice", help="Named Faith Nexus experiment variant: jenny_warm, aria_clear, guy_calm, or andrew_steady")
+    parser.add_argument("--faith-rate", help="Optional Edge TTS rate override, e.g. -8%%")
 
     args = parser.parse_args()
 
     if args.faith_storyboard:
         if args.channel != "christian":
             parser.error("--faith-storyboard is only available for the christian channel")
-        report = run_faith_nexus_storyboard(args.faith_storyboard, args.output_dir, args.faith_image_provider, args.comfy_workflow_template)
+        report = run_faith_nexus_storyboard(args.faith_storyboard, args.output_dir, args.faith_image_provider, args.comfy_workflow_template, args.faith_voice, args.faith_rate)
     else:
         report = run_pipeline(
             channel=args.channel,
