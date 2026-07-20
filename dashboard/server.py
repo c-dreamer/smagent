@@ -87,8 +87,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 8765), DashboardHandler)
-    print("smagent dashboard: http://127.0.0.1:8765")
+    server = ThreadingHTTPServer(("127.0.0.1", 8766), DashboardHandler)
+    print("smagent dashboard: http://127.0.0.1:8766")
     server.serve_forever()
 
 
