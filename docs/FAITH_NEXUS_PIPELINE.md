@@ -52,6 +52,14 @@ then set `COMFYUI_URL`, for example `http://127.0.0.1:8188`. The included
 `sd3.5_large.safetensors` checkpoint on a capable GPU worker. Do not attempt
 this 8 GB M1 as the production generator; it is intended for a remote GPU.
 
+## Approved-video delivery
+
+Review candidates remain in the Downloads review bundle. On a human approval,
+the approval gate moves the Faith Nexus MP4 to the directory named by
+`SMAGENT_FAITH_NEXUS_DELIVERY_DIR`; it refuses to overwrite an existing file.
+For this workstation the private environment points to the synced Google Drive
+`FaithNexus` folder. Approval does not publish the video to any platform.
+
 ## Approval requirements
 
 The storyboard validator requires a full exact WEB verse, 85–105 narration

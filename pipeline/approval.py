@@ -4,8 +4,13 @@
 import argparse
 import json
 import os
+import re
+import shutil
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
@@ -13,6 +18,38 @@ if _PARENT not in sys.path:
 
 from config import CHANNELS  # noqa: E402
 from quality.review import assess_review, blank_review  # noqa: E402
+
+load_dotenv(Path(__file__).resolve().parents[3] / "human-ai.env2")
+
+
+def _faith_nexus_delivery_dir() -> str:
+    """Return the configured human-approved delivery folder, never a publish target."""
+    path = os.environ.get("SMAGENT_FAITH_NEXUS_DELIVERY_DIR", "").strip()
+    if not path:
+        raise ValueError("SMAGENT_FAITH_NEXUS_DELIVERY_DIR must be configured before approving a Faith Nexus video.")
+    return path
+
+
+def _delivery_filename(topic: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_")
+    return f"FaithNexus_{slug}.mp4"
+
+
+def _deliver_approved_video(manifest: dict) -> str | None:
+    if manifest.get("channel") != "christian":
+        return None
+    source = manifest.get("artifacts", {}).get("video")
+    if not source or not os.path.isfile(source):
+        raise FileNotFoundError("Approved Faith Nexus video is missing from its review bundle.")
+    destination_dir = _faith_nexus_delivery_dir()
+    os.makedirs(destination_dir, exist_ok=True)
+    destination = os.path.join(destination_dir, _delivery_filename(manifest["topic"]))
+    if os.path.exists(destination):
+        raise FileExistsError(f"Refusing to overwrite an existing approved video: {destination}")
+    shutil.move(source, destination)
+    manifest["artifacts"]["video"] = destination
+    manifest["delivery"] = {"status": "delivered", "path": destination}
+    return destination
 
 
 def create_review_manifest(channel: str, topic: str, artifacts: dict,
@@ -54,6 +91,7 @@ def approve(manifest_path: str) -> dict:
         raise ValueError("Cannot approve: record a passing quality review first.")
     manifest["status"] = "approved"
     manifest["approved_at"] = datetime.now(timezone.utc).isoformat()
+    _deliver_approved_video(manifest)
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2, default=str)
     print(f"Approved. Manifest updated: {manifest_path}")
