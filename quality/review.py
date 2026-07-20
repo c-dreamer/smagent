@@ -59,6 +59,8 @@ def validate_faith_nexus_bundle(storyboard_path: str | Path, timing_path: str | 
         "one_visual_per_beat": len(provenance.get("assets", [])) == len(storyboard["visual_beats"]),
         "generated_visuals": bool(provenance.get("assets")) and all(asset.get("generated") is True for asset in provenance["assets"]),
         "caption_events": bool(captions.get("events")),
+        "continuous_caption_track": bool(captions.get("caption_track_continuous")) and Path(str(captions.get("caption_track", ""))).is_file(),
+        "cta_animation": (not captions.get("cta_required")) or Path(str(captions.get("cta_asset", ""))).is_file(),
         "audio_duration": float(captions.get("audio_duration", 0)) > 0,
     }
     return {"passed": all(checks.values()), "checks": checks, "requires_human_approval": True}

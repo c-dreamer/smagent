@@ -17,6 +17,11 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = Path.home() / "Downloads" / "smagent_output"
 SETTINGS = ROOT / "dashboard" / "postiz.local.json"
+CHANNELS = {
+    "soccer": {"name": "GoalHubPro", "handle": "@Goal_HubPro", "niche": "Soccer analysis and highlights"},
+    "christian": {"name": "Faith Nexus", "handle": "@Faith_Nexus", "niche": "Faith and Bible study"},
+    "trading": {"name": "Trading", "handle": "TBD", "niche": "Market analysis and trading strategies"},
+}
 
 
 def _read_settings() -> dict:
@@ -30,15 +35,18 @@ def _status() -> dict:
     if OUTPUT_ROOT.exists():
         for video in sorted(OUTPUT_ROOT.rglob("*.mp4"), key=lambda item: item.stat().st_mtime, reverse=True):
             manifest = video.with_name("review_manifest.json")
+            review = json.loads(manifest.read_text()) if manifest.exists() else {}
             candidates.append({
                 "name": video.name,
                 "path": str(video.relative_to(OUTPUT_ROOT)),
                 "modified": int(video.stat().st_mtime),
-                "review_status": json.loads(manifest.read_text()).get("status", "review_required") if manifest.exists() else "review_required",
+                "channel": review.get("channel", "christian"),
+                "review_status": review.get("status", "review_required"),
             })
     settings = _read_settings()
     return {
         "output_root": str(OUTPUT_ROOT),
+        "channels": CHANNELS,
         "videos": candidates,
         "postiz": {"base_url": settings.get("base_url", ""), "api_key_env": settings.get("api_key_env", "POSTIZ_API_KEY"), "configured": bool(settings.get("base_url"))},
         "publishing": "disabled_pending_human_approval",

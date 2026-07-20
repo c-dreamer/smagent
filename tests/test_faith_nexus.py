@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from faith_nexus import load_storyboard, validate_storyboard, words
-from media_proc.faith_nexus_renderer import _caption_groups
+from media_proc.faith_nexus_renderer import _caption_groups, _cta_start
 from quality.review import validate_faith_nexus_bundle
 
 
@@ -15,7 +15,7 @@ STORYBOARD = ROOT / "examples" / "faith_nexus_matthew_6_34_storyboard.json"
 def test_reference_storyboard_is_source_bound_and_complete():
     storyboard = load_storyboard(STORYBOARD)
     assert storyboard["evidence"]["verse"]["translation"] == "WEB"
-    assert len(storyboard["visual_beats"]) == 12
+    assert len(storyboard["visual_beats"]) == 13
 
 
 def test_storyboard_rejects_missing_complete_verse():
@@ -46,6 +46,14 @@ def test_caption_events_hold_through_tts_pauses_without_flashing():
     assert events[0]["tokens"] == ["Peace", "for", "today"]
 
 
+def test_cta_detection_requires_spoken_like_and_subscribe():
+    words_with_cta = [
+        {"text": "Jesus", "start": 1.0}, {"text": "loves", "start": 1.2},
+        {"text": "Like", "start": 1.4}, {"text": "and", "start": 1.6}, {"text": "subscribe", "start": 1.8},
+    ]
+    assert _cta_start(words_with_cta) == 1.4
+
+
 def test_bundle_preflight_requires_all_review_inputs(tmp_path):
     storyboard = tmp_path / "storyboard.json"
     storyboard.write_text(STORYBOARD.read_text())
@@ -55,5 +63,9 @@ def test_bundle_preflight_requires_all_review_inputs(tmp_path):
     provenance = tmp_path / "provenance.json"
     provenance.write_text(json.dumps({"assets": [{"beat_number": index, "generated": True} for index in range(1, 13)]}))
     captions = tmp_path / "captions.json"
-    captions.write_text(json.dumps({"events": [{"start": 0, "end": 0.1}], "audio_duration": 35.0}))
+    caption_track = tmp_path / "captions.mov"
+    cta_asset = tmp_path / "cta.png"
+    caption_track.touch()
+    cta_asset.touch()
+    captions.write_text(json.dumps({"events": [{"start": 0, "end": 0.1}], "caption_track": str(caption_track), "caption_track_continuous": True, "cta_required": True, "cta_asset": str(cta_asset), "audio_duration": 35.0}))
     assert validate_faith_nexus_bundle(storyboard, timings, provenance, captions)["passed"]

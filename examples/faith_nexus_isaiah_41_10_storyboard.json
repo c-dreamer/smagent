@@ -1,0 +1,31 @@
+{
+  "channel": "christian",
+  "title": "When Courage Feels Small",
+  "narration": "Some days, courage feels small. It is getting out of bed when your heart is tired. It is facing a conversation you have been avoiding. God does not stand far away from that fear. He speaks this promise: “Don’t you be afraid, for I am with you. Don’t be dismayed, for I am your God. I will strengthen you. Yes, I will help you. Yes, I will uphold you with the right hand of my righteousness.” Isaiah 41:10. You do not have to manufacture strength tonight. Receive the help God promises. Jesus loves you, and stay blessed. Like and subscribe for more Christian content.",
+  "evidence": {
+    "verse": {
+      "reference": "Isaiah 41:10",
+      "translation": "WEB",
+      "text": "Don’t you be afraid, for I am with you. Don’t be dismayed, for I am your God. I will strengthen you. Yes, I will help you. Yes, I will uphold you with the right hand of my righteousness.",
+      "source_url": "https://ebible.org/eng-web/ISA41.htm"
+    }
+  },
+  "visual_style": "Cinematic devotional realism, soft crimson dawn, deep indigo shadows, reverent Christian symbolism, cohesive subtle film grain, no text, no logos, no depiction of Jesus, vertical 9:16.",
+  "caption_style": {"accent_hex": "#DE6B5E", "caption_hex": "#FFFFFF", "theme_name": "crimson courage"},
+  "transition_style": "cut",
+  "visual_beats": [
+    {"beat_number": 1, "start_word": 1, "end_word": 7, "image_prompt": "A young man sitting quietly on the edge of a bed before sunrise, heavy but resilient posture, cinematic devotional realism", "camera_motion": "push_in", "transition": "cut"},
+    {"beat_number": 2, "start_word": 8, "end_word": 15, "image_prompt": "Bare feet touching a wooden floor beside a bed in first dawn light, intimate realistic visual story of courage", "camera_motion": "pan_right", "transition": "cut"},
+    {"beat_number": 3, "start_word": 16, "end_word": 24, "image_prompt": "A person pausing before an unopened doorway, warm hall light against blue shadows, quiet decision moment", "camera_motion": "pull_out", "transition": "cut"},
+    {"beat_number": 4, "start_word": 25, "end_word": 34, "image_prompt": "A worried person looking through a rain-streaked window, hands steady on the sill, cinematic devotional photography", "camera_motion": "push_in", "transition": "cut"},
+    {"beat_number": 5, "start_word": 35, "end_word": 42, "image_prompt": "An open Bible beside a small candle in a dark quiet room, glowing pages without legible text, reverent composition", "camera_motion": "pan_left", "transition": "cut"},
+    {"beat_number": 6, "start_word": 43, "end_word": 50, "image_prompt": "Ancient olive trees on a hillside at sunrise, path opening through warm crimson light, biblical atmosphere, no people", "camera_motion": "push_in", "transition": "cut"},
+    {"beat_number": 7, "start_word": 51, "end_word": 59, "image_prompt": "A lone traveler on a stone path under a wide dawn sky, calm strength replacing fear, photorealistic devotional film", "camera_motion": "pan_right", "transition": "cut"},
+    {"beat_number": 8, "start_word": 60, "end_word": 67, "image_prompt": "Hands receiving warm sunlight through an open window, hopeful spiritual symbolism, cinematic realism", "camera_motion": "pull_out", "transition": "cut"},
+    {"beat_number": 9, "start_word": 68, "end_word": 75, "image_prompt": "A strong ancient olive branch against a glowing sky, quiet image of support and endurance, biblical landscape", "camera_motion": "pan_left", "transition": "cut"},
+    {"beat_number": 10, "start_word": 76, "end_word": 83, "image_prompt": "A person taking one confident step onto a sunlit path, back view, modest everyday clothing, inspirational Christian short film", "camera_motion": "push_in", "transition": "cut"},
+    {"beat_number": 11, "start_word": 84, "end_word": 90, "image_prompt": "A hand resting peacefully on an open Bible beside a cup of tea, warm crimson morning palette, intimate devotional still life", "camera_motion": "pan_right", "transition": "cut"},
+    {"beat_number": 12, "start_word": 91, "end_word": 98, "image_prompt": "A person standing in soft dawn light with relaxed shoulders, hopeful and comforted, no text, cinematic devotional realism", "camera_motion": "pull_out", "transition": "cut"},
+    {"beat_number": 13, "start_word": 99, "end_word": 105, "image_prompt": "Simple luminous cross silhouette on a distant hill at crimson dawn, reverent closing composition, no text, no logos", "camera_motion": "still", "transition": "cut"}
+  ]
+}

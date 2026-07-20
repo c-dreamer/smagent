@@ -123,6 +123,27 @@ def _caption_png(tokens: list[str], active: int, destination: Path, accent: tupl
     image.save(destination)
 
 
+def _cta_png(destination: Path) -> None:
+    """A distinct call-to-action badge, separate from Scripture captions."""
+    image = Image.new("RGBA", (740, 182), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((5, 5, 735, 177), radius=42, fill=(207, 31, 45, 248), outline=(255, 255, 255, 245), width=4)
+    label = "LIKE  +  SUBSCRIBE"
+    font = _font(54)
+    width = draw.textlength(label, font=font)
+    draw.text(((740 - width) / 2, 54), label, font=font, fill=WHITE, stroke_width=3, stroke_fill=(75, 0, 7, 235))
+    image.save(destination)
+
+
+def _cta_start(timed_words: list[dict[str, Any]]) -> float | None:
+    """Locate the spoken CTA so it can be presented as a distinct badge."""
+    lower = [str(word.get("text", "")).lower() for word in timed_words]
+    for index in range(len(lower) - 2):
+        if lower[index:index + 3] == ["like", "and", "subscribe"]:
+            return float(timed_words[index]["start"])
+    return None
+
+
 def _wrapped_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, maximum_width: int) -> str:
     words_in_text, lines, line = text.split(), [], ""
     for word in words_in_text:
@@ -187,20 +208,28 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     output.parent.mkdir(parents=True, exist_ok=True)
     caption_dir = output.parent / "caption_overlays"
     caption_dir.mkdir(parents=True, exist_ok=True)
-    caption_events = _caption_groups(timings)
+    cta_start = _cta_start(timed_words)
+    caption_timings = {"words": timed_words[:next(index for index, word in enumerate(timed_words) if float(word["start"]) >= cta_start)]} if cta_start is not None else timings
+    caption_events = _caption_groups(caption_timings)
     caption_files: list[Path] = []
     for index, event in enumerate(caption_events):
         path = caption_dir / f"word_{index:03d}.png"
         _caption_png(event["tokens"], event["active"], path, accent, caption_colour)
         caption_files.append(path)
     caption_track = _render_caption_track(caption_events, caption_files, duration, output.parent / "faith_nexus_captions.mov")
+    cta_overlay = output.parent / "faith_nexus_cta.png"
+    if cta_start is not None:
+        _cta_png(cta_overlay)
     scripture_overlay = caption_dir / "scripture.png"
     _scripture_png(storyboard["evidence"]["verse"], scripture_overlay, accent)
 
     command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for image, segment_duration in zip(assets, segment_durations):
         command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{segment_duration:.4f}", "-i", str(image)])
-    command.extend(["-i", str(caption_track), "-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
+    command.extend(["-i", str(caption_track)])
+    if cta_start is not None:
+        command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{duration - cta_start:.4f}", "-i", str(cta_overlay)])
+    command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
     if music_path:
         command.extend(["-i", str(music_path)])
 
@@ -219,6 +248,11 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     filters.append(f"[{current}][captions]overlay=0:0:eof_action=pass[vcaptions]")
     current = "vcaptions"
     scripture_input = caption_input + 1
+    if cta_start is not None:
+        filters.append(f"[{caption_input + 1}:v]setpts=PTS-STARTPTS+{cta_start:.4f}/TB,scale=w='iw*(1+0.035*sin(2*PI*1.2*t))':h=-1:eval=frame[cta]")
+        filters.append(f"[{current}][cta]overlay=x=(W-w)/2:y=H-h-110:eof_action=pass[vcta]")
+        current = "vcta"
+        scripture_input += 1
     filters.append(f"[{scripture_input}:v]setpts=PTS-STARTPTS[scripture]")
     filters.append(f"[{current}][scripture]overlay=0:0:eof_action=pass[vscripture]")
     current = "vscripture"
@@ -238,7 +272,8 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr[-4000:])
-    (output.with_suffix(".caption_manifest.json")).write_text(json.dumps({"timing_source": str(timing_file), "caption_track": str(caption_track), "events": caption_events, "audio_duration": duration}, indent=2), encoding="utf-8")
+    cta_required = cta_start is not None
+    (output.with_suffix(".caption_manifest.json")).write_text(json.dumps({"timing_source": str(timing_file), "caption_track": str(caption_track), "caption_track_continuous": True, "cta_required": cta_required, "cta_asset": str(cta_overlay) if cta_required else None, "events": caption_events, "audio_duration": duration}, indent=2), encoding="utf-8")
     return output
 
 
