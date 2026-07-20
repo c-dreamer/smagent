@@ -58,7 +58,7 @@ def _caption_groups(timings: dict[str, Any]) -> list[dict[str, Any]]:
     if not entries:
         raise ValueError("Word timing JSON has no words.")
     result: list[dict[str, Any]] = []
-    group_size = 5
+    group_size = 4
     for start in range(0, len(entries), group_size):
         group = entries[start:start + group_size]
         for active, item in enumerate(group):
@@ -70,6 +70,28 @@ def _caption_groups(timings: dict[str, Any]) -> list[dict[str, Any]]:
                            "tokens": [word["text"] for word in group], "active": active})
             result[-1]["end"] = max(float(result[-1]["end"]), next_start)
     return result
+
+
+def _render_caption_track(events: list[dict[str, Any]], overlays: list[Path], duration: float, destination: Path) -> Path:
+    """Create one continuous alpha video for captions.
+
+    Caption PNGs must not be independently overlaid onto the main video: that
+    causes an overlay to repeatedly start and stop at every word boundary on
+    some FFmpeg builds.  Encoding them first as a single alpha track makes the
+    text a persistent layer; only the highlighted word changes inside it.
+    """
+    command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+    for event, overlay in zip(events, overlays):
+        command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{float(event['end']) - float(event['start']):.4f}", "-i", str(overlay)])
+    filters = []
+    for index, event in enumerate(events):
+        filters.append(f"[{index}:v]setpts=PTS-STARTPTS,trim=duration={float(event['end']) - float(event['start']):.4f}[caption{index}]")
+    filters.append("".join(f"[caption{index}]" for index in range(len(events))) + f"concat=n={len(events)}:v=1:a=0,tpad=stop_mode=clone:stop_duration={duration:.4f},trim=duration={duration:.4f}[captions]")
+    command.extend(["-filter_complex", ";".join(filters), "-map", "[captions]", "-c:v", "qtrle", "-pix_fmt", "argb", "-an", str(destination)])
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError("Caption-track render failed: " + result.stderr[-4000:])
+    return destination
 
 
 def _caption_png(tokens: list[str], active: int, destination: Path, accent: tuple[int, int, int, int], caption: tuple[int, int, int, int]) -> None:
@@ -171,15 +193,14 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
         path = caption_dir / f"word_{index:03d}.png"
         _caption_png(event["tokens"], event["active"], path, accent, caption_colour)
         caption_files.append(path)
+    caption_track = _render_caption_track(caption_events, caption_files, duration, output.parent / "faith_nexus_captions.mov")
     scripture_overlay = caption_dir / "scripture.png"
     _scripture_png(storyboard["evidence"]["verse"], scripture_overlay, accent)
 
     command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for image, segment_duration in zip(assets, segment_durations):
         command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{segment_duration:.4f}", "-i", str(image)])
-    for event, overlay in zip(caption_events, caption_files):
-        command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{event['end'] - event['start']:.4f}", "-i", str(overlay)])
-    command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
+    command.extend(["-i", str(caption_track), "-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
     if music_path:
         command.extend(["-i", str(music_path)])
 
@@ -193,13 +214,11 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     else:
         filters.append("".join(f"[v{index}]" for index in range(len(beats))) + f"concat=n={len(beats)}:v=1:a=0[vmain]")
         current = "vmain"
-    for index, event in enumerate(caption_events):
-        image_input = len(beats) + index
-        label = "vcaptions" if index == len(caption_events) - 1 else f"cap{index}"
-        filters.append(f"[{image_input}:v]setpts=PTS-STARTPTS+{event['start']:.4f}/TB[overlay{index}]")
-        filters.append(f"[{current}][overlay{index}]overlay=0:0:eof_action=pass[{label}]")
-        current = label
-    scripture_input = len(beats) + len(caption_events)
+    caption_input = len(beats)
+    filters.append(f"[{caption_input}:v]setpts=PTS-STARTPTS[captions]")
+    filters.append(f"[{current}][captions]overlay=0:0:eof_action=pass[vcaptions]")
+    current = "vcaptions"
+    scripture_input = caption_input + 1
     filters.append(f"[{scripture_input}:v]setpts=PTS-STARTPTS[scripture]")
     filters.append(f"[{current}][scripture]overlay=0:0:eof_action=pass[vscripture]")
     current = "vscripture"
@@ -219,7 +238,7 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr[-4000:])
-    (output.with_suffix(".caption_manifest.json")).write_text(json.dumps({"timing_source": str(timing_file), "events": caption_events, "audio_duration": duration}, indent=2), encoding="utf-8")
+    (output.with_suffix(".caption_manifest.json")).write_text(json.dumps({"timing_source": str(timing_file), "caption_track": str(caption_track), "events": caption_events, "audio_duration": duration}, indent=2), encoding="utf-8")
     return output
 
 

@@ -1,7 +1,7 @@
 {
   "channel": "christian",
   "title": "When Tomorrow Feels Too Heavy",
-  "narration": "Before the day has even begun, tomorrow can feel louder than today. The messages you have not answered. The decision you cannot make. The fear that you will not be enough. Jesus speaks directly into that weight: “Therefore, don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.” Matthew 6:34. God is not asking you to carry the whole week tonight. Bring him this moment. Take the next faithful step. Let tomorrow rest in his hands.",
+  "narration": "Before the day has even begun, tomorrow can feel louder than today. The messages you have not answered. The decision you cannot make. The fear that you will not be enough. Jesus speaks directly into that weight: “Therefore, don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.” Matthew 6:34. God is not asking you to carry the whole week tonight. Bring him this moment. Take the next faithful step. Let tomorrow rest in his hands. Jesus loves you, and stay blessed. Like and subscribe for more Christian content.",
   "evidence": {
     "verse": {
       "reference": "Matthew 6:34",
@@ -29,6 +29,7 @@
     {"beat_number": 9, "start_word": 60, "end_word": 66, "image_prompt": "Woman standing at an open window as sunlight fills a quiet room, relief replacing anxiety, cinematic soft light", "camera_motion": "push_in", "transition": "fade"},
     {"beat_number": 10, "start_word": 67, "end_word": 73, "image_prompt": "Hands gently placing a weekly planner aside beside an open Bible, calm release, warm devotional still life", "camera_motion": "pan_left", "transition": "fade"},
     {"beat_number": 11, "start_word": 74, "end_word": 79, "image_prompt": "A person walking one small step along a sunlit path through olive trees, hopeful Christian symbolism, no face", "camera_motion": "push_in", "transition": "fade"},
-    {"beat_number": 12, "start_word": 80, "end_word": 85, "image_prompt": "Open hands held toward a glowing dawn sky above distant hills, peaceful surrender, cinematic devotional realism", "camera_motion": "pull_out", "transition": "fade"}
+    {"beat_number": 12, "start_word": 80, "end_word": 85, "image_prompt": "Open hands held toward a glowing dawn sky above distant hills, peaceful surrender, cinematic devotional realism", "camera_motion": "pull_out", "transition": "fade"},
+    {"beat_number": 13, "start_word": 86, "end_word": 98, "image_prompt": "A sunlit cross silhouette on a distant hill at dawn, warm hopeful sky, simple reverent Christian end-card composition, no text, no logos", "camera_motion": "pull_out", "transition": "fade"}
   ]
 }
