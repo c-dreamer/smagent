@@ -17,6 +17,7 @@ from config import CHANNELS  # noqa: E402
 from schema import PipelineStateModel  # noqa: E402
 from pipeline import approval  # noqa: E402
 from channel_configs import get_channel_config  # noqa: E402
+from faith_nexus import load_storyboard  # noqa: E402
 
 STAGES = ["script", "thumbnail", "voiceover", "metadata", "download_clips", "compile", "review"]
 DEFAULT_OUTPUT_DIR = str(Path.home() / "Downloads" / "smagent_output")
@@ -41,6 +42,54 @@ def _run_module(module_path: str, args: list, stage: str) -> PipelineStateModel:
         state.error = e.stderr.strip() or str(e)
         state.completed_at = _now()
     return state
+
+
+def run_faith_nexus_storyboard(
+    storyboard_path: str,
+    output_dir: str,
+    image_provider: str = "comfyui",
+    workflow_template: str | None = None,
+) -> dict:
+    """Run the audio-led devotional pipeline; it never uploads or auto-approves."""
+    storyboard = load_storyboard(storyboard_path)
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    copied_storyboard = destination / "faith_nexus_storyboard.json"
+    copied_storyboard.write_text(json.dumps(storyboard, indent=2), encoding="utf-8")
+    audio = destination / "faith_nexus_audio.mp3"
+    timings = destination / "faith_nexus_audio.words.json"
+    images = destination / "images"
+    video = destination / "faith_nexus_review.mp4"
+    states: dict[str, dict] = {}
+
+    voice = _run_module(os.path.join(_PARENT, "media_proc", "voiceover.py"), [
+        "--channel", "christian", "--script-text", storyboard["narration"], "--output", str(audio),
+        "--timings-output", str(timings),
+    ], "voiceover")
+    states["voiceover"] = voice.model_dump() if hasattr(voice, "model_dump") else voice.dict()
+    if voice.status != "completed":
+        return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
+
+    image_args = ["--storyboard", str(copied_storyboard), "--output-dir", str(images), "--provider", image_provider]
+    if workflow_template:
+        image_args.extend(["--workflow-template", workflow_template])
+    visual = _run_module(os.path.join(_PARENT, "visual_gen", "faith_images.py"), image_args, "visuals")
+    states["visuals"] = visual.model_dump() if hasattr(visual, "model_dump") else visual.dict()
+    if visual.status != "completed":
+        return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
+
+    render = _run_module(os.path.join(_PARENT, "media_proc", "faith_nexus_renderer.py"), [
+        "--storyboard", str(copied_storyboard), "--audio", str(audio), "--timings", str(timings),
+        "--images-dir", str(images), "--output", str(video),
+    ], "compile")
+    states["compile"] = render.model_dump() if hasattr(render, "model_dump") else render.dict()
+    if render.status != "completed":
+        return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
+    artifacts = {"storyboard": str(copied_storyboard), "audio": str(audio), "word_timings": str(timings),
+                 "visual_provenance": str(images / "visual_asset_provenance.json"), "caption_manifest": str(video.with_suffix(".caption_manifest.json")), "video": str(video)}
+    manifest = approval.create_review_manifest("christian", storyboard["title"], artifacts, str(destination))
+    states["review"] = {"stage": "review", "status": "pending_approval", "artifacts": {"manifest": manifest}}
+    return {"channel": "christian", "topic": storyboard["title"], "status": "pending_approval", "stages": states, "artifacts": artifacts, "review_manifest": manifest}
 
 
 def run_pipeline(
@@ -273,20 +322,28 @@ def main():
     parser.add_argument("--evidence-file", help="JSON evidence pack required by --script-provider nvidia")
     parser.add_argument("--asset-provider", choices=["none", "pexels", "commons"], default="none",
                         help="pexels or commons retrieves provenance-tracked clips; pexels is preferred for production")
+    parser.add_argument("--faith-storyboard", help="Run the audio-led Faith Nexus image-film from a validated storyboard JSON")
+    parser.add_argument("--faith-image-provider", choices=["comfyui", "pexels"], default="comfyui")
+    parser.add_argument("--comfy-workflow-template", help="ComfyUI API workflow JSON containing {{PROMPT}}")
 
     args = parser.parse_args()
 
-    report = run_pipeline(
-        channel=args.channel,
-        topic=args.topic,
-        output_dir=args.output_dir,
-        youtube_url=args.youtube_url,
-        tiktok_url=args.tiktok_url,
-        skip_download=args.skip_download,
-        script_provider=args.script_provider,
-        evidence_file=args.evidence_file,
-        asset_provider=args.asset_provider,
-    )
+    if args.faith_storyboard:
+        if args.channel != "christian":
+            parser.error("--faith-storyboard is only available for the christian channel")
+        report = run_faith_nexus_storyboard(args.faith_storyboard, args.output_dir, args.faith_image_provider, args.comfy_workflow_template)
+    else:
+        report = run_pipeline(
+            channel=args.channel,
+            topic=args.topic,
+            output_dir=args.output_dir,
+            youtube_url=args.youtube_url,
+            tiktok_url=args.tiktok_url,
+            skip_download=args.skip_download,
+            script_provider=args.script_provider,
+            evidence_file=args.evidence_file,
+            asset_provider=args.asset_provider,
+        )
 
     report_path = args.report or os.path.join(args.output_dir, "pipeline_report.json")
     os.makedirs(os.path.dirname(report_path), exist_ok=True)

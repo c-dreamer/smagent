@@ -1,0 +1,28 @@
+{
+  "channel": "christian",
+  "title": "When Tomorrow Feels Too Heavy",
+  "narration": "Before the day has even begun, tomorrow can feel louder than today. The messages you have not answered. The decision you cannot make. The fear that you will not be enough. Jesus speaks directly into that weight: “Therefore, don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.” Matthew 6:34. God is not asking you to carry the whole week tonight. Bring him this moment. Take the next faithful step. Let tomorrow rest in his hands.",
+  "evidence": {
+    "verse": {
+      "reference": "Matthew 6:34",
+      "translation": "WEB",
+      "text": "Therefore, don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.",
+      "source_url": "https://ebible.org/eng-web/MAT06.htm"
+    }
+  },
+  "visual_style": "Cinematic devotional realism, warm amber dawn and deep navy shadows, reverent Christian symbolism, soft film grain, no text, no logos, no depiction of Jesus, vertical 9:16.",
+  "visual_beats": [
+    {"beat_number": 1, "start_word": 1, "end_word": 8, "image_prompt": "A young woman awake before sunrise in a dark bedroom, alarm clock glowing, worry visible in her posture, cinematic devotional realism", "camera_motion": "push_in", "transition": "fade"},
+    {"beat_number": 2, "start_word": 9, "end_word": 16, "image_prompt": "Close portrait of a woman sitting on the edge of a bed, morning blue shadows, hands clasped, contemplative Christian short film", "camera_motion": "pull_out", "transition": "fade"},
+    {"beat_number": 3, "start_word": 17, "end_word": 23, "image_prompt": "Unread messages glowing softly on a phone beside a cold cup of coffee, shallow depth of field, warm dawn light", "camera_motion": "pan_right", "transition": "fade"},
+    {"beat_number": 4, "start_word": 24, "end_word": 30, "image_prompt": "A lone person at a kitchen table with a closed notebook and a decision hanging over them, moody window light", "camera_motion": "push_in", "transition": "fade"},
+    {"beat_number": 5, "start_word": 31, "end_word": 37, "image_prompt": "Trembling hands resting on an open Bible near a candle, intimate realistic devotional photography", "camera_motion": "pan_left", "transition": "fade"},
+    {"beat_number": 6, "start_word": 38, "end_word": 45, "image_prompt": "Ancient Judean hillside at first light, a quiet path descending between olive trees, cinematic biblical atmosphere, no people", "camera_motion": "push_in", "transition": "fade"},
+    {"beat_number": 7, "start_word": 46, "end_word": 52, "image_prompt": "Sunlight breaking through olive branches over a stone path, peaceful biblical landscape, photorealistic", "camera_motion": "pan_right", "transition": "fade"},
+    {"beat_number": 8, "start_word": 53, "end_word": 59, "image_prompt": "A weathered open Bible on a wooden table in golden morning light, no legible printed text, reverent composition", "camera_motion": "pull_out", "transition": "fade"},
+    {"beat_number": 9, "start_word": 60, "end_word": 66, "image_prompt": "Woman standing at an open window as sunlight fills a quiet room, relief replacing anxiety, cinematic soft light", "camera_motion": "push_in", "transition": "fade"},
+    {"beat_number": 10, "start_word": 67, "end_word": 73, "image_prompt": "Hands gently placing a weekly planner aside beside an open Bible, calm release, warm devotional still life", "camera_motion": "pan_left", "transition": "fade"},
+    {"beat_number": 11, "start_word": 74, "end_word": 79, "image_prompt": "A person walking one small step along a sunlit path through olive trees, hopeful Christian symbolism, no face", "camera_motion": "push_in", "transition": "fade"},
+    {"beat_number": 12, "start_word": 80, "end_word": 85, "image_prompt": "Open hands held toward a glowing dawn sky above distant hills, peaceful surrender, cinematic devotional realism", "camera_motion": "pull_out", "transition": "fade"}
+  ]
+}

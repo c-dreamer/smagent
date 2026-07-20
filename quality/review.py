@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
+import json
+
+from faith_nexus import load_storyboard, words
 
 REQUIRED_DIMENSIONS = (
     "emotional_specificity",
@@ -40,3 +44,20 @@ def assess_review(review: dict[str, Any], minimum_score: int = 4) -> dict[str, A
         "below_bar": below_bar,
         "blocking_issues": blocking,
     }
+
+
+def validate_faith_nexus_bundle(storyboard_path: str | Path, timing_path: str | Path,
+                                provenance_path: str | Path, caption_path: str | Path) -> dict[str, Any]:
+    """Machine preflight; human review still decides whether the candidate publishes."""
+    storyboard = load_storyboard(storyboard_path)
+    timings = json.loads(Path(timing_path).read_text(encoding="utf-8"))
+    provenance = json.loads(Path(provenance_path).read_text(encoding="utf-8"))
+    captions = json.loads(Path(caption_path).read_text(encoding="utf-8"))
+    checks = {
+        "exact_web_verse": storyboard["evidence"]["verse"]["text"] in storyboard["narration"],
+        "timed_every_word": len(timings.get("words", [])) == len(words(storyboard["narration"])),
+        "one_visual_per_beat": len(provenance.get("assets", [])) == len(storyboard["visual_beats"]),
+        "caption_events": bool(captions.get("events")),
+        "audio_duration": float(captions.get("audio_duration", 0)) > 0,
+    }
+    return {"passed": all(checks.values()), "checks": checks, "requires_human_approval": True}

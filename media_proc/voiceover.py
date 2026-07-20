@@ -8,6 +8,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from typing import List
 
@@ -60,10 +61,25 @@ def get_voice_settings(channel: str) -> tuple[str, str]:
         return 'en-US-GuyNeural', '+0%'
 
 
-async def generate_audio(text: str, voice: str, rate: str, output_path: str) -> None:
-    """Generate audio from text using edge-tts and save to output_path."""
-    communicate = edge_tts.Communicate(text, voice, rate=rate)
-    await communicate.save(output_path)
+async def generate_audio(text: str, voice: str, rate: str, output_path: str) -> list[dict]:
+    """Generate audio and retain provider word boundaries for precise captions."""
+    communicate = edge_tts.Communicate(text, voice, rate=rate, boundary="WordBoundary")
+    boundaries: list[dict] = []
+    with open(output_path, "wb") as audio:
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio.write(chunk["data"])
+            elif chunk["type"] == "WordBoundary":
+                tokens = re.findall(r"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?", chunk["text"])
+                start = chunk["offset"] / 10_000_000
+                duration = chunk["duration"] / 10_000_000
+                for index, token in enumerate(tokens):
+                    token_start = start + duration * index / len(tokens)
+                    token_end = start + duration * (index + 1) / len(tokens)
+                    boundaries.append({"text": token, "start": round(token_start, 4), "end": round(token_end, 4)})
+    if not boundaries:
+        raise RuntimeError("TTS returned no word boundaries; refusing to render unsynchronised captions.")
+    return boundaries
 
 
 def validate_audio_file(file_path: str) -> None:
@@ -113,6 +129,7 @@ def main() -> None:
         choices=['soccer', 'christian', 'trading'],
         help='Channel name to determine voice settings.'
     )
+    parser.add_argument('--timings-output', help='JSON destination for exact TTS word boundaries.')
     parser.add_argument(
         '--output',
         type=str,
@@ -150,7 +167,10 @@ def main() -> None:
     
     # Generate audio
     try:
-        asyncio.run(generate_audio(text, voice, rate, args.output))
+        boundaries = asyncio.run(generate_audio(text, voice, rate, args.output))
+        timings_path = args.timings_output or os.path.splitext(args.output)[0] + '.words.json'
+        with open(timings_path, 'w', encoding='utf-8') as timing_handle:
+            json.dump({"provider": "edge-tts", "voice": voice, "rate": rate, "text": text, "words": boundaries}, timing_handle, indent=2)
     except Exception as e:
         print(f'Error generating audio: {e}', file=sys.stderr)
         sys.exit(1)
