@@ -2,8 +2,12 @@
 
 The new Faith Nexus route is an audio-led image-film: it creates word timings
 with TTS, acquires one visual for every storyboard beat, then renders animated
-images with word-highlight captions. It creates review artifacts only; it never
+images with word-highlight captions and a persistent exact Scripture card. It creates review artifacts only; it never
 uploads or approves a video.
+
+`caption_style` belongs in each storyboard. Set `accent_hex` and `caption_hex`
+per video to match its emotional palette; gold is only the warm-dawn default,
+not a channel-wide brand requirement.
 
 ## Run the Matthew 6:34 candidate
 

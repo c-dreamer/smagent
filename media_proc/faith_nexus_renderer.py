@@ -30,6 +30,16 @@ def _font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(path, size)
 
 
+def _rgba(value: str | None, fallback: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    """Read an optional storyboard colour without making gold a global rule."""
+    if not value:
+        return fallback
+    code = value.lstrip("#")
+    if len(code) != 6:
+        raise ValueError(f"Invalid caption colour: {value}")
+    return tuple(int(code[index:index + 2], 16) for index in range(0, 6, 2)) + (255,)
+
+
 def _audio_duration(path: Path) -> float:
     result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(path)], capture_output=True, text=True, check=True)
     return float(result.stdout.strip())
@@ -48,7 +58,7 @@ def _caption_groups(timings: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def _caption_png(tokens: list[str], active: int, destination: Path) -> None:
+def _caption_png(tokens: list[str], active: int, destination: Path, accent: tuple[int, int, int, int], caption: tuple[int, int, int, int]) -> None:
     image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     font = _font(88)
@@ -70,10 +80,38 @@ def _caption_png(tokens: list[str], active: int, destination: Path) -> None:
         width = sum(item[2] for item in row) + space * (len(row) - 1)
         x = (WIDTH - width) // 2
         for index, token, token_width in row:
-            colour = GOLD if index == active else WHITE
+            colour = accent if index == active else caption
             draw.text((x, y), token, font=font, fill=colour, stroke_width=5, stroke_fill=OUTLINE)
             x += token_width + space
         y += 110
+    image.save(destination)
+
+
+def _wrapped_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, maximum_width: int) -> str:
+    words_in_text, lines, line = text.split(), [], ""
+    for word in words_in_text:
+        candidate = f"{line} {word}".strip()
+        if line and draw.textlength(candidate, font=font) > maximum_width:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _scripture_png(verse: dict[str, str], destination: Path, accent: tuple[int, int, int, int]) -> None:
+    """A persistent, source-visible verse card inspired by Bible app clarity."""
+    image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    panel = (38, 48, WIDTH - 38, 286)
+    draw.rounded_rectangle(panel, radius=28, fill=(7, 12, 24, 190), outline=(*accent[:3], 185), width=2)
+    label_font, verse_font = _font(34), _font(35)
+    label = f"{verse['reference'].upper()}  •  {verse['translation'].upper()}"
+    draw.text((72, 76), label, font=label_font, fill=accent, stroke_width=1, stroke_fill=(0, 0, 0, 170))
+    body = _wrapped_text(draw, verse["text"], verse_font, 900)
+    draw.multiline_text((72, 126), body, font=verse_font, fill=WHITE, spacing=5, stroke_width=2, stroke_fill=(0, 0, 0, 165))
     image.save(destination)
 
 
@@ -106,6 +144,9 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     transition = 0.32
     segment_durations = [end - start + (transition if index < len(beats) - 1 else 0.0) for index, (start, end) in enumerate(beat_times)]
 
+    palette = storyboard.get("caption_style", {})
+    accent = _rgba(palette.get("accent_hex"), GOLD)
+    caption_colour = _rgba(palette.get("caption_hex"), WHITE)
     output.parent.mkdir(parents=True, exist_ok=True)
     caption_dir = output.parent / "caption_overlays"
     caption_dir.mkdir(parents=True, exist_ok=True)
@@ -113,15 +154,17 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     caption_files: list[Path] = []
     for index, event in enumerate(caption_events):
         path = caption_dir / f"word_{index:03d}.png"
-        _caption_png(event["tokens"], event["active"], path)
+        _caption_png(event["tokens"], event["active"], path, accent, caption_colour)
         caption_files.append(path)
+    scripture_overlay = caption_dir / "scripture.png"
+    _scripture_png(storyboard["evidence"]["verse"], scripture_overlay, accent)
 
     command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
     for image, segment_duration in zip(assets, segment_durations):
         command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{segment_duration:.4f}", "-i", str(image)])
     for event, overlay in zip(caption_events, caption_files):
         command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{event['end'] - event['start']:.4f}", "-i", str(overlay)])
-    command.extend(["-i", str(audio)])
+    command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
 
     filters: list[str] = []
     motion = {"push_in": "min(zoom+0.0008,1.10)", "pull_out": "max(zoom-0.0007,1.0)", "pan_left": "min(zoom+0.0005,1.06)", "pan_right": "min(zoom+0.0005,1.06)", "still": "1.02"}
@@ -143,7 +186,11 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
         filters.append(f"[{image_input}:v]setpts=PTS-STARTPTS+{event['start']:.4f}/TB[overlay{index}]")
         filters.append(f"[{current}][overlay{index}]overlay=0:0:eof_action=pass[{label}]")
         current = label
-    audio_input = len(beats) + len(caption_events)
+    scripture_input = len(beats) + len(caption_events)
+    filters.append(f"[{scripture_input}:v]setpts=PTS-STARTPTS[scripture]")
+    filters.append(f"[{current}][scripture]overlay=0:0:eof_action=pass[vscripture]")
+    current = "vscripture"
+    audio_input = scripture_input + 1
     # Xfade overlaps can shorten the visual stream by a few frames. Hold the
     # final image, then trim precisely to the measured narration duration.
     filters.append(f"[{current}]tpad=stop_mode=clone:stop_duration={duration:.4f},trim=duration={duration:.4f}[vout]")
