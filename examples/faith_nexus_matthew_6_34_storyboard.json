@@ -16,6 +16,7 @@
     "caption_hex": "#FFFFFF",
     "theme_name": "warm dawn"
   },
+  "transition_style": "cut",
   "visual_beats": [
     {"beat_number": 1, "start_word": 1, "end_word": 8, "image_prompt": "A young woman awake before sunrise in a dark bedroom, alarm clock glowing, worry visible in her posture, cinematic devotional realism", "camera_motion": "push_in", "transition": "fade"},
     {"beat_number": 2, "start_word": 9, "end_word": 16, "image_prompt": "Close portrait of a woman sitting on the edge of a bed, morning blue shadows, hands clasped, contemplative Christian short film", "camera_motion": "pull_out", "transition": "fade"},
