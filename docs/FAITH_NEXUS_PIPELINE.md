@@ -5,6 +5,10 @@ with TTS, acquires one visual for every storyboard beat, then renders animated
 images with word-highlight captions and a persistent exact Scripture card. It creates review artifacts only; it never
 uploads or approves a video.
 
+Each devotional can generate an original, low-level ambient bed from synthesis.
+The generated WAV and its provenance JSON are preserved in the review bundle;
+use a separately recorded licence manifest if replacing it with external music.
+
 `caption_style` belongs in each storyboard. Set `accent_hex` and `caption_hex`
 per video to match its emotional palette; gold is only the warm-dawn default,
 not a channel-wide brand requirement.

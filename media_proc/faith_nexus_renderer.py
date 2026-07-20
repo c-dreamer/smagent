@@ -108,7 +108,7 @@ def _scripture_png(verse: dict[str, str], destination: Path, accent: tuple[int, 
     panel = (38, 48, WIDTH - 38, 286)
     draw.rounded_rectangle(panel, radius=28, fill=(7, 12, 24, 190), outline=(*accent[:3], 185), width=2)
     label_font, verse_font = _font(34), _font(35)
-    label = f"{verse['reference'].upper()}  •  {verse['translation'].upper()}"
+    label = verse["reference"].upper()
     draw.text((72, 76), label, font=label_font, fill=accent, stroke_width=1, stroke_fill=(0, 0, 0, 170))
     body = _wrapped_text(draw, verse["text"], verse_font, 900)
     draw.multiline_text((72, 126), body, font=verse_font, fill=WHITE, spacing=5, stroke_width=2, stroke_fill=(0, 0, 0, 165))
@@ -127,7 +127,7 @@ def _asset_paths(images_dir: Path, beats: list[dict[str, Any]]) -> list[Path]:
     return [path for path in paths if path is not None]
 
 
-def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str | Path, images_dir: str | Path, output_path: str | Path) -> Path:
+def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str | Path, images_dir: str | Path, output_path: str | Path, music_path: str | Path | None = None) -> Path:
     storyboard = load_storyboard(storyboard_path)
     audio, timing_file, images, output = Path(audio_path), Path(timing_path), Path(images_dir), Path(output_path)
     timings = json.loads(timing_file.read_text(encoding="utf-8"))
@@ -141,8 +141,9 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
         start = 0.0 if beat["start_word"] == 1 else float(timed_words[beat["start_word"] - 1]["start"])
         end = duration if beat["end_word"] == len(timed_words) else float(timed_words[beat["end_word"] - 1]["end"])
         beat_times.append((start, max(end, start + 0.5)))
-    transition = 0.32
-    segment_durations = [end - start + (transition if index < len(beats) - 1 else 0.0) for index, (start, end) in enumerate(beat_times)]
+    # Devotionals use editorial cuts by default: crossfading two unrelated
+    # images causes an unwanted double exposure and weakens each beat.
+    segment_durations = [end - start for start, end in beat_times]
 
     palette = storyboard.get("caption_style", {})
     accent = _rgba(palette.get("accent_hex"), GOLD)
@@ -165,21 +166,19 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     for event, overlay in zip(caption_events, caption_files):
         command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{event['end'] - event['start']:.4f}", "-i", str(overlay)])
     command.extend(["-loop", "1", "-framerate", str(FPS), "-t", f"{duration:.4f}", "-i", str(scripture_overlay), "-i", str(audio)])
+    if music_path:
+        command.extend(["-i", str(music_path)])
 
     filters: list[str] = []
     motion = {"push_in": "min(zoom+0.0008,1.10)", "pull_out": "max(zoom-0.0007,1.0)", "pan_left": "min(zoom+0.0005,1.06)", "pan_right": "min(zoom+0.0005,1.06)", "still": "1.02"}
     for index, (beat, segment_duration) in enumerate(zip(beats, segment_durations)):
         zoom = motion[beat["camera_motion"]]
         filters.append(f"[{index}:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},zoompan=z='{zoom}':d=1:s={WIDTH}x{HEIGHT}:fps={FPS},trim=duration={segment_duration:.4f},setpts=PTS-STARTPTS[v{index}]")
-    current, elapsed = "v0", segment_durations[0]
-    for index in range(1, len(beats)):
-        label = "vmain" if index == len(beats) - 1 else f"x{index}"
-        offset = max(0.0, elapsed - transition)
-        filters.append(f"[{current}][v{index}]xfade=transition=fade:duration={transition}:offset={offset:.4f}[{label}]")
-        elapsed += segment_durations[index] - transition
-        current = label
     if len(beats) == 1:
         current = "v0"
+    else:
+        filters.append("".join(f"[v{index}]" for index in range(len(beats))) + f"concat=n={len(beats)}:v=1:a=0[vmain]")
+        current = "vmain"
     for index, event in enumerate(caption_events):
         image_input = len(beats) + index
         label = "vcaptions" if index == len(caption_events) - 1 else f"cap{index}"
@@ -194,7 +193,14 @@ def render(storyboard_path: str | Path, audio_path: str | Path, timing_path: str
     # Xfade overlaps can shorten the visual stream by a few frames. Hold the
     # final image, then trim precisely to the measured narration duration.
     filters.append(f"[{current}]tpad=stop_mode=clone:stop_duration={duration:.4f},trim=duration={duration:.4f}[vout]")
-    filters.append(f"[{audio_input}:a]aresample=44100,atrim=duration={duration:.4f}[aout]")
+    if music_path:
+        music_input = audio_input + 1
+        fade_start = max(0.0, duration - 2.5)
+        filters.append(f"[{audio_input}:a]aresample=44100,atrim=duration={duration:.4f}[voice]")
+        filters.append(f"[{music_input}:a]aresample=44100,volume=0.12,atrim=duration={duration:.4f},afade=t=in:st=0:d=1.5,afade=t=out:st={fade_start:.4f}:d=2.5[music]")
+        filters.append("[voice][music]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+    else:
+        filters.append(f"[{audio_input}:a]aresample=44100,atrim=duration={duration:.4f}[aout]")
     command.extend(["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-crf", "19", "-preset", "medium", "-pix_fmt", "yuv420p", "-r", str(FPS), "-c:a", "aac", "-b:a", "160k", "-t", f"{duration:.4f}", "-movflags", "+faststart", str(output)])
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
@@ -209,9 +215,10 @@ def main() -> None:
     parser.add_argument("--audio", required=True)
     parser.add_argument("--timings", required=True)
     parser.add_argument("--images-dir", required=True)
+    parser.add_argument("--music", help="Optional original/licensed background music, mixed gently below narration")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    print(render(args.storyboard, args.audio, args.timings, args.images_dir, args.output))
+    print(render(args.storyboard, args.audio, args.timings, args.images_dir, args.output, args.music))
 
 
 if __name__ == "__main__":

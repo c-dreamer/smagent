@@ -59,6 +59,7 @@ def run_faith_nexus_storyboard(
     audio = destination / "faith_nexus_audio.mp3"
     timings = destination / "faith_nexus_audio.words.json"
     images = destination / "images"
+    music = destination / "faith_nexus_ambient.wav"
     video = destination / "faith_nexus_review.mp4"
     states: dict[str, dict] = {}
 
@@ -78,14 +79,19 @@ def run_faith_nexus_storyboard(
     if visual.status != "completed":
         return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
 
+    music_stage = _run_module(os.path.join(_PARENT, "media_proc", "ambient_music.py"), ["--audio", str(audio), "--output", str(music)], "music")
+    states["music"] = music_stage.model_dump() if hasattr(music_stage, "model_dump") else music_stage.dict()
+    if music_stage.status != "completed":
+        return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
+
     render = _run_module(os.path.join(_PARENT, "media_proc", "faith_nexus_renderer.py"), [
         "--storyboard", str(copied_storyboard), "--audio", str(audio), "--timings", str(timings),
-        "--images-dir", str(images), "--output", str(video),
+        "--images-dir", str(images), "--music", str(music), "--output", str(video),
     ], "compile")
     states["compile"] = render.model_dump() if hasattr(render, "model_dump") else render.dict()
     if render.status != "completed":
         return {"channel": "christian", "topic": storyboard["title"], "status": "failed", "stages": states}
-    artifacts = {"storyboard": str(copied_storyboard), "audio": str(audio), "word_timings": str(timings),
+    artifacts = {"storyboard": str(copied_storyboard), "audio": str(audio), "music": str(music), "music_provenance": str(music.with_suffix(".provenance.json")), "word_timings": str(timings),
                  "visual_provenance": str(images / "visual_asset_provenance.json"), "caption_manifest": str(video.with_suffix(".caption_manifest.json")), "video": str(video)}
     manifest = approval.create_review_manifest("christian", storyboard["title"], artifacts, str(destination))
     states["review"] = {"stage": "review", "status": "pending_approval", "artifacts": {"manifest": manifest}}
