@@ -10,7 +10,7 @@ Key features:
 - Reaction emoji overlays (🔥, 😱, 💀)
 - Stat callouts ("GOAL!", "RECORD!", "UNBELIEVABLE")
 - Channel watermark integration
-- Copyright-breaking visual layers for soccer clips
+- Branded visual layers for licensed soccer clips
 """
 
 import json

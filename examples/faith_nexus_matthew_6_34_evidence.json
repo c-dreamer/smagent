@@ -1,0 +1,18 @@
+{
+  "sources": [
+    {
+      "id": "matthew-6-34-web",
+      "kind": "scripture",
+      "reference": "Matthew 6:34",
+      "translation": "World English Bible (WEB)",
+      "text": "Therefore don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.",
+      "licence": "Public domain",
+      "url": "https://worldenglish.bible/"
+    }
+  ],
+  "editorial_boundaries": [
+    "Do not promise that prayer removes every difficulty.",
+    "Do not add words to the verse or present application as a quotation.",
+    "Do not use a depiction of Jesus or a generated Bible page."
+  ]
+}

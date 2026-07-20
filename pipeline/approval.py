@@ -12,6 +12,7 @@ if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
 from config import CHANNELS  # noqa: E402
+from quality.review import assess_review, blank_review  # noqa: E402
 
 
 def create_review_manifest(channel: str, topic: str, artifacts: dict,
@@ -28,6 +29,8 @@ def create_review_manifest(channel: str, topic: str, artifacts: dict,
             "handle": CHANNELS[channel].handle,
             "niche": CHANNELS[channel].niche,
         },
+        "quality_review": blank_review(),
+        "quality_review_decision": {"approved": False, "reason": "quality review not recorded"},
     }
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, "review_manifest.json")
@@ -46,11 +49,29 @@ def approve(manifest_path: str) -> dict:
     if manifest.get("status") == "approved":
         print("Already approved.")
         return manifest
+    decision = manifest.get("quality_review_decision", {})
+    if not decision.get("approved"):
+        raise ValueError("Cannot approve: record a passing quality review first.")
     manifest["status"] = "approved"
     manifest["approved_at"] = datetime.now(timezone.utc).isoformat()
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2, default=str)
     print(f"Approved. Manifest updated: {manifest_path}")
+    return manifest
+
+
+def record_quality_review(manifest_path: str, review_path: str) -> dict:
+    """Attach a completed rubric review before human approval is possible."""
+    with open(manifest_path, "r", encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    with open(review_path, "r", encoding="utf-8") as handle:
+        review = json.load(handle)
+    decision = assess_review(review)
+    manifest["quality_review"] = review
+    manifest["quality_review_decision"] = decision
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2, default=str)
+    print("Quality review recorded: " + ("passed" if decision["approved"] else "not yet passing"))
     return manifest
 
 
@@ -108,6 +129,10 @@ def main():
     p_reject.add_argument("--manifest", required=True)
     p_reject.add_argument("--reason", default="")
 
+    p_quality = sub.add_parser("record-quality", help="Attach a completed rubric review")
+    p_quality.add_argument("--manifest", required=True)
+    p_quality.add_argument("--review", required=True, help="JSON completed from examples/faith_nexus_review_template.json")
+
     args = parser.parse_args()
     if args.command == "review":
         show_review(args.manifest)
@@ -115,6 +140,8 @@ def main():
         approve(args.manifest)
     elif args.command == "reject":
         reject(args.manifest, args.reason)
+    elif args.command == "record-quality":
+        record_quality_review(args.manifest, args.review)
 
 
 if __name__ == "__main__":

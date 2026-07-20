@@ -74,6 +74,9 @@ def build_filter_complex(
     transition: float,
     watermark_text: str,
     total_duration_with_cta: float,
+    faith_style: bool = False,
+    cta_text: str = CTA_TEXT,
+    cta_duration: float = CTA_DURATION,
 ) -> str:
     """
     Build the ffmpeg filter_complex string.
@@ -110,20 +113,22 @@ def build_filter_complex(
 
     # Add text overlays to each scene stream
     for i, scene in enumerate(scenes):
-        text = scene.get("voiceover_text", "").split(".")[0].strip() or scene.get("description", "")
+        text = scene.get("on_screen_text", "").strip() or scene.get("voiceover_text", "").split(".")[0].strip() or scene.get("description", "")
         if len(text) > 80:
             text = text[:77] + "..."
         if not text:
             text = f"Scene {scene.get('scene_number', i+1)}"
-        font_size = max(20, int(width / 38))
+        font_size = max(20, int(width / (28 if faith_style else 38)))
         stroke = max(2, int(font_size / 14))
         margin = max(40, int(width / 30))
+        font_color = "0xF6C945" if faith_style else "white"
+        y_position = "h*0.62" if faith_style else f"h-text_h-{margin}"
         dt = (
             f"drawtext=fontfile='{font_path}':"
             f"text='{escape_drawtext(text)}':"
-            f"fontcolor=white:fontsize={font_size}:"
-            f"box=1:boxcolor=0x00000099:boxborderw=12:"
-            f"x=(w-text_w)/2:y=h-text_h-{margin}:"
+            f"fontcolor={font_color}:fontsize={font_size}:"
+            f"borderw={4 if faith_style else 2}:bordercolor=black:"
+            f"x=(w-text_w)/2:y={y_position}:"
             f"alpha=0.95"
         )
         parts.append(f"[v{i}]{dt}[v{i}t]")
@@ -160,16 +165,16 @@ def build_filter_complex(
     )
     parts.append(f"[{last_label}]{watermark}[vwm]")
 
-    # Append CTA clip (5s black with red-stroked white text)
+    # Append a channel-specific CTA card.
     cta_font = max(48, int(width / 16))
     cta_stroke = max(4, int(cta_font / 14))
     cta = (
-        f"color=c=0x0a0a0a:s={width}x{height}:d={CTA_DURATION}:r={fps},"
+        f"color=c=0x0a0a0a:s={width}x{height}:d={cta_duration}:r={fps},"
         f"setpts=PTS-STARTPTS,format=yuv420p,"
         f"drawtext=fontfile='{font_path}':"
-        f"text='{escape_drawtext(CTA_TEXT)}':"
-        f"fontcolor=white:fontsize={cta_font}:"
-        f"borderw={cta_stroke}:bordercolor=red:"
+        f"text='{escape_drawtext(cta_text)}':"
+        f"fontcolor={'0xF6C945' if faith_style else 'white'}:fontsize={cta_font}:"
+        f"borderw={cta_stroke}:bordercolor={'black' if faith_style else 'red'}:"
         f"x=(w-text_w)/2:y=(h-text_h)/2"
         f"[vcta]"
     )
@@ -187,7 +192,7 @@ def assemble_video_ffmpeg(
     channel: str,
     output_path: str,
     clips_dir: Optional[str] = None,
-    apply_copyright_safe: bool = True,
+    apply_source_transforms: bool = False,
     channel_handle: Optional[str] = None,
 ) -> str:
     """
@@ -245,9 +250,9 @@ def assemble_video_ffmpeg(
     print(f"Assembling {channel} video (ffmpeg): {width}x{height} {fps}fps, {len(scenes)} scenes")
     print(f"  Clips available: {len(available)}")
     print(f"  Watermark: {watermark_text}")
-    print(f"  CTA: '{CTA_TEXT}' ({CTA_DURATION}s)")
+    print(f"  CTA: '{config.cta_text}' ({config.cta_duration}s)")
 
-    total_video = sum(s.get("duration_seconds", 0) for s in scenes) - transition * (len(scenes) - 1) + CTA_DURATION
+    total_video = sum(s.get("duration_seconds", 0) for s in scenes) - transition * (len(scenes) - 1) + config.cta_duration
     print(f"  Target total duration: {total_video:.1f}s")
 
     fc = build_filter_complex(
@@ -259,6 +264,9 @@ def assemble_video_ffmpeg(
         transition=transition,
         watermark_text=watermark_text,
         total_duration_with_cta=total_video,
+        faith_style=config.channel_key == "christian",
+        cta_text=config.cta_text or "",
+        cta_duration=config.cta_duration,
     )
 
     # Audio: voiceover + CTA TTS (mixed if both present)
@@ -268,6 +276,8 @@ def assemble_video_ffmpeg(
         audio_inputs.append(audio_path)
     cta_tts_path = os.path.join(os.path.dirname(output_path), "cta_tts_for_ffmpeg.mp3")
     try:
+        if not config.cta_voice:
+            raise RuntimeError("CTA voice disabled for this channel")
         import edge_tts
         import asyncio
         async def _gen():
@@ -296,7 +306,7 @@ def assemble_video_ffmpeg(
     cta_idx = len(scene_clips) + 1 if len(audio_inputs) > 1 else None
 
     if audio_inputs:
-        cta_start = total_video - CTA_DURATION
+        cta_start = total_video - config.cta_duration
         if cta_idx is not None:
             audio_filters.append(
                 f"[{vo_idx}:a]aresample=44100,apad=whole_dur={total_video}[vo];"

@@ -5,7 +5,7 @@ Clip assembler — composes videos from real video clips using moviepy.
 Features:
   - Multi-clip support: different clips per scene, auto-segmentation of single clip
   - Channel watermark/logo overlay (text-based watermarks)
-  - Copyright-safe transforms: mirror flip, slight speed change, color tweak
+  - Optional aesthetic transforms for assets whose licence has already been verified
   - Scene text overlays per scene
   - Voiceover TTS audio overlay
   - Scale/fit to channel orientation (landscape 16:9 or portrait 9:16)
@@ -38,12 +38,11 @@ try:
 except ImportError:
     HAS_MOVIEPY = False
 
-# ── Copyright-safe transforms ───────────────────────────────────────────────
-# These subtle transforms help avoid YouTube Content ID automatic flagging.
-# They're applied deterministically based on the video hash so the same clip
-# always gets the same transform.
+# ── Optional visual transforms ──────────────────────────────────────────────
+# These are aesthetic transforms only. They do not create permission, fair use,
+# ownership, or eligibility for monetisation, and are disabled by default.
 
-COPYRIGHT_TRANSFORMS = {
+AESTHETIC_TRANSFORMS = {
     0: "speed_up_5pct",
     1: "mirror_flip",
     2: "saturate_10pct",
@@ -55,16 +54,14 @@ COPYRIGHT_TRANSFORMS = {
 def _get_clip_hash_int(path: str) -> int:
     """Get a deterministic int from the clip path for consistent transforms."""
     h = hashlib.md5(path.encode()).hexdigest()
-    return int(h[:8], 16) % len(COPYRIGHT_TRANSFORMS)
+    return int(h[:8], 16) % len(AESTHETIC_TRANSFORMS)
 
-def apply_copyright_safe(clip: "VideoFileClip", clip_path: str) -> "VideoFileClip":
+def apply_aesthetic_transform(clip: "VideoFileClip", clip_path: str) -> "VideoFileClip":
     """
-    Apply a subtle copyright-safe transform to a clip.
-    These transforms are designed to avoid YouTube Content ID while
-    being barely perceptible to humans.
+    Apply an optional aesthetic transform to a clip with documented provenance.
     """
     transform_idx = _get_clip_hash_int(clip_path)
-    transform_name = COPYRIGHT_TRANSFORMS[transform_idx]
+    transform_name = AESTHETIC_TRANSFORMS[transform_idx]
     
     if transform_name == "mirror_flip":
         clip = clip.with_effects([MirrorX()])
@@ -252,12 +249,15 @@ class ClipSegmentManager:
 # ── Scene assembly ──────────────────────────────────────────────────────────
 
 def make_text_overlay(scene: dict, config: ChannelVideoConfig, clip_dur: float) -> "TextClip":
-    """Create a scene title text overlay."""
+    """Create a concise, editor-authored scene overlay."""
     voiceover = scene.get("voiceover_text", "")
     description = scene.get("description", "")
-    
-    # Use first sentence of voiceover or description as the overlay
-    text = voiceover.split(".")[0].strip() if voiceover else description
+
+    # Evidence-first scripts supply a short on-screen line. Fall back only for
+    # legacy template scripts that do not have one.
+    text = scene.get("on_screen_text", "").strip()
+    if not text:
+        text = voiceover.split(".")[0].strip() if voiceover else description
     if not text:
         text = f"Scene {scene.get('scene_number', '?')}"
     
@@ -265,19 +265,21 @@ def make_text_overlay(scene: dict, config: ChannelVideoConfig, clip_dur: float) 
     if len(text) > 80:
         text = text[:77] + "..."
     
+    faith_style = config.channel_key == "christian"
     txt = TextClip(
         text=text,
-        font_size=config.subtitle_fontsize,
-        color=config.font_color,
+        font_size=int(config.subtitle_fontsize * (1.45 if faith_style else 1.0)),
+        color="#F6C945" if faith_style else config.font_color,
         font=config.font_name,
         stroke_color="black",
-        stroke_width=3,
-        size=(config.width - 160, None),
+        stroke_width=4 if faith_style else 3,
+        size=(config.width - (120 if faith_style else 160), None),
         method="caption",
         text_align="center",
     )
-    txt = txt.with_position(("center", config.height - txt.h - 80))
-    txt = txt.with_duration(min(clip_dur, 8.0))  # Show for 8s max
+    y_position = int(config.height * 0.62) if faith_style else config.height - txt.h - 80
+    txt = txt.with_position(("center", y_position))
+    txt = txt.with_duration(min(clip_dur, 5.5 if faith_style else 8.0))
     # Fade in/out
     txt = txt.with_start(0.3)
     
@@ -288,7 +290,7 @@ def make_scene_clip(
     scene: dict,
     config: ChannelVideoConfig,
     segment_manager: "ClipSegmentManager",
-    apply_copyright: bool = True,
+    apply_transform: bool = False,
 ) -> "VideoFileClip":
     """
     Build a scene clip with real video footage, text overlay, and transforms.
@@ -324,9 +326,8 @@ def make_scene_clip(
             target_res = (config.width, config.height)
             clip = load_clip(clip_path, start_time, end_time, target_resolution=target_res)
 
-            # Copyright-safe transform
-            if apply_copyright:
-                clip = apply_copyright_safe(clip, clip_path)
+            if apply_transform:
+                clip = apply_aesthetic_transform(clip, clip_path)
 
             # Set exact duration
             clip = clip.with_duration(duration)
@@ -386,7 +387,7 @@ def assemble_video(
     channel: str,
     output_path: str,
     clips_dir: Optional[str] = None,
-    apply_copyright_safe: bool = True,
+    apply_source_transforms: bool = False,
     channel_handle: Optional[str] = None,
 ) -> str:
     """
@@ -398,7 +399,7 @@ def assemble_video(
         channel: Channel key
         output_path: Output video path
         clips_dir: Directory with video clips
-        apply_copyright_safe: Apply subtle transforms to avoid Content ID
+        apply_source_transforms: Apply optional aesthetic transforms to licensed assets
         channel_handle: Watermark text (e.g. @Goal_HubPro)
     """
     if not HAS_MOVIEPY:
@@ -424,7 +425,7 @@ def assemble_video(
     print("Building scene clips...")
     scene_clips = []
     for i, scene in enumerate(scenes):
-        clip = make_scene_clip(scene, config, segment_mgr, apply_copyright_safe)
+        clip = make_scene_clip(scene, config, segment_mgr, apply_source_transforms)
         scene_clips.append(clip)
         print(f"  Scene {i + 1}: {clip.duration:.1f}s — {'clip' if clip_path_used(scene, segment_mgr) else 'text card'}")
     
@@ -464,26 +465,29 @@ def assemble_video(
     else:
         print("No voiceover — using clip audio")
     
-    # ── Add "LIKE AND SUBSCRIBE" CTA at end ───────────────────────────────
-    cta_duration = 5.0
+    # ── Add channel-specific CTA at end ───────────────────────────────────
+    cta_duration = config.cta_duration
     cta_start = video.duration
     cta_text = TextClip(
-        text="LIKE AND SUBSCRIBE",
+        text=config.cta_text or "",
         font_size=config.title_fontsize + 10,
-        color="white",
+        color="#F6C945" if config.channel_key == "christian" else "white",
         font=config.font_name,
-        stroke_color="red",
+        stroke_color="black" if config.channel_key == "christian" else "red",
         stroke_width=4,
         size=(config.width - 100, None),
         method="caption",
         text_align="center",
     )
     cta_text = cta_text.with_position("center").with_duration(cta_duration)
-    cta_clip = CompositeVideoClip([cta_text]).with_start(cta_start)
-    video = CompositeVideoClip([video, cta_clip])
-    print(f"  CTA: 'LIKE AND SUBSCRIBE' text overlay at end ({cta_duration}s)")
+    if config.cta_text and cta_duration > 0:
+        cta_clip = CompositeVideoClip([cta_text]).with_start(cta_start)
+        video = CompositeVideoClip([video, cta_clip])
+        print(f"  CTA: '{config.cta_text}' text overlay at end ({cta_duration}s)")
     
     try:
+        if not config.cta_voice:
+            raise RuntimeError("CTA voice disabled for this channel")
         cta_tts_path = output_path.replace(".mp4", "_cta.mp3")
         _generate_cta_tts_sync(cta_tts_path)
         if os.path.exists(cta_tts_path):
@@ -551,8 +555,8 @@ def main():
     parser.add_argument("--channel", required=True, help="Channel key")
     parser.add_argument("--output", required=True, help="Output video path")
     parser.add_argument("--clips-dir", help="Directory with source video clips")
-    parser.add_argument("--no-copyright-safe", action="store_true",
-                        help="Disable copyright-safe transforms")
+    parser.add_argument("--allow-source-transforms", action="store_true",
+                        help="Apply optional aesthetic transforms to licensed source assets")
     parser.add_argument("--watermark", help="Watermark text (default: channel handle)")
     args = parser.parse_args()
     
@@ -563,7 +567,7 @@ def main():
             channel=args.channel,
             output_path=args.output,
             clips_dir=args.clips_dir,
-            apply_copyright_safe=not args.no_copyright_safe,
+            apply_source_transforms=args.allow_source_transforms,
             channel_handle=args.watermark,
         )
     except Exception as e:

@@ -50,6 +50,9 @@ class ChannelVideoConfig:
     # ── Logo / watermark ───────────────────────────────────────────────────
     logo_path: Optional[str] = None
     logo_position: str = "top-right"      # top-left, top-right, bottom-left, bottom-right
+    cta_text: Optional[str] = "LIKE AND SUBSCRIBE"
+    cta_duration: float = 5.0
+    cta_voice: bool = True
 
 
 # ── Per-channel configs ─────────────────────────────────────────────────────
@@ -89,6 +92,9 @@ CHANNEL_VIDEO_CONFIGS: dict[str, ChannelVideoConfig] = {
         prefer_yt_download=False,
         use_stock_clips=True,
         stock_dir="/home/yahweh1_2025/videos/source",
+        cta_text="Save this for tomorrow",
+        cta_duration=2.5,
+        cta_voice=False,
     ),
     "trading": ChannelVideoConfig(
         channel_key="trading",

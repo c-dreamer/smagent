@@ -1,0 +1,16 @@
+{
+  "reviewer": "human or Codex-comparison",
+  "scale": "1-5",
+  "dimensions": {
+    "emotional_specificity": null,
+    "source_fidelity": null,
+    "visual_coherence": null,
+    "voice_caption_sync": null,
+    "brand_fit": null,
+    "technical_finish": null,
+    "provenance": null
+  },
+  "blocking_issues": [],
+  "notes": "Codex is an optional comparator only; it is not a production-stage dependency.",
+  "approved": false
+}

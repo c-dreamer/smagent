@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
@@ -18,6 +19,7 @@ from pipeline import approval  # noqa: E402
 from channel_configs import get_channel_config  # noqa: E402
 
 STAGES = ["script", "thumbnail", "voiceover", "metadata", "download_clips", "compile", "review"]
+DEFAULT_OUTPUT_DIR = str(Path.home() / "Downloads" / "smagent_output")
 
 
 def _now() -> str:
@@ -48,6 +50,9 @@ def run_pipeline(
     youtube_url: str | None = None,
     tiktok_url: str | None = None,
     skip_download: bool = False,
+    script_provider: str = "template",
+    evidence_file: str | None = None,
+    asset_provider: str = "none",
 ) -> dict:
     """
     Run the full content generation pipeline for a channel.
@@ -72,9 +77,13 @@ def run_pipeline(
 
     # ── Stage 1: Script ────────────────────────────────────────────────────
     script_path = f"{base}_script.json"
+    script_args = ["--channel", channel, "--topic", topic, "--output", script_path,
+                   "--provider", script_provider]
+    if evidence_file:
+        script_args.extend(["--evidence-file", evidence_file])
     s1 = _run_module(
         os.path.join(_PARENT, "script_gen", "generator.py"),
-        ["--channel", channel, "--topic", topic, "--output", script_path],
+        script_args,
         "script",
     )
     states["script"] = s1.model_dump() if hasattr(s1, "model_dump") else s1.dict()
@@ -122,8 +131,23 @@ def run_pipeline(
     clips_dir = os.path.join(output_dir, "clips")
     os.makedirs(clips_dir, exist_ok=True)
     download_results = []
+    provenance_path = None
 
-    if not skip_download:
+    if asset_provider in {"pexels", "commons"}:
+        provenance_path = os.path.join(output_dir, "visual_asset_provenance.json")
+        asset_module = "pexels.py" if asset_provider == "pexels" else "wikimedia_commons.py"
+        visual_stage = _run_module(
+            os.path.join(_PARENT, "visual_gen", asset_module),
+            ["--script", script_path, "--output-dir", clips_dir, "--manifest", provenance_path],
+            "download_clips",
+        )
+        if visual_stage.status != "completed":
+            states["download_clips"] = visual_stage.model_dump() if hasattr(visual_stage, "model_dump") else visual_stage.dict()
+            return {"channel": channel, "topic": topic, "status": "failed", "stages": states}
+        download_results = [str(path) for path in sorted(Path(clips_dir).glob("*.mp4"))]
+        artifacts["visual_provenance"] = provenance_path
+
+    if not skip_download and asset_provider == "none":
         if youtube_url:
             print(f"\nDownloading YouTube video: {youtube_url}")
             dl_path = os.path.join(clips_dir, "yt_source.mp4")
@@ -157,7 +181,7 @@ def run_pipeline(
         "status": download_status,
         "started_at": _now(),
         "completed_at": _now(),
-        "artifacts": {"clips_dir": clips_dir, "downloaded": download_results},
+        "artifacts": {"clips_dir": clips_dir, "downloaded": download_results, "provenance": provenance_path},
     }
 
     # If we have source stock clips and no YouTube/TikTok download, copy them
@@ -189,13 +213,19 @@ def run_pipeline(
     ch_info = CHANNELS.get(channel)
     if ch_info and ch_info.handle:
         compile_args.extend(["--watermark", ch_info.handle])
-    # Copyright-safe is on by default — user can pass --no-copyright-safe to disable
 
-    s6 = _run_module(
-        os.path.join(_PARENT, "media_proc", "clip_assembler.py"),
-        compile_args,
-        "compile",
-    )
+    if channel == "christian":
+        s6 = _run_module(
+            os.path.join(_PARENT, "media_proc", "faith_nexus_renderer.py"),
+            ["--script", script_path, "--audio", audio_path, "--clips-dir", clips_dir, "--output", video_path],
+            "compile",
+        )
+    else:
+        s6 = _run_module(
+            os.path.join(_PARENT, "media_proc", "clip_assembler.py"),
+            compile_args,
+            "compile",
+        )
     states["compile"] = s6.model_dump() if hasattr(s6, "model_dump") else s6.dict()
     if s6.status != "completed":
         return {"channel": channel, "topic": topic, "status": "failed", "stages": states}
@@ -231,13 +261,18 @@ def main():
     parser.add_argument("--channel", required=True, choices=list(CHANNELS.keys()),
                         help="Channel key")
     parser.add_argument("--topic", required=True, help="Video topic")
-    parser.add_argument("--output-dir", default="/tmp/pipeline_output",
+    parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR,
                         help="Directory for all generated artifacts")
     parser.add_argument("--report", help="Path to write pipeline report JSON")
     parser.add_argument("--youtube-url", help="YouTube URL to download and use as clip source")
     parser.add_argument("--tiktok-url", help="TikTok URL to download and use as clip source")
     parser.add_argument("--skip-download", action="store_true",
                         help="Skip download stage, use existing clips only")
+    parser.add_argument("--script-provider", choices=["template", "nvidia"], default="template",
+                        help="Use nvidia only with a source-bound evidence pack")
+    parser.add_argument("--evidence-file", help="JSON evidence pack required by --script-provider nvidia")
+    parser.add_argument("--asset-provider", choices=["none", "pexels", "commons"], default="none",
+                        help="pexels or commons retrieves provenance-tracked clips; pexels is preferred for production")
 
     args = parser.parse_args()
 
@@ -248,6 +283,9 @@ def main():
         youtube_url=args.youtube_url,
         tiktok_url=args.tiktok_url,
         skip_download=args.skip_download,
+        script_provider=args.script_provider,
+        evidence_file=args.evidence_file,
+        asset_provider=args.asset_provider,
     )
 
     report_path = args.report or os.path.join(args.output_dir, "pipeline_report.json")

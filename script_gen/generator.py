@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script generation engine for the social media agent.
-Generates YouTube video scripts via template filling (simulating LLM).
+Generates YouTube video scripts via a template fallback or an evidence-bound provider.
 """
 
 import sys
@@ -20,6 +20,7 @@ if _HERE not in sys.path:
 
 from config import CHANNELS
 import templates
+from nvidia_writer import generate_faith_script
 
 
 def generate_script(channel: str, topic: str) -> Dict[str, Any]:
@@ -86,16 +87,43 @@ def _generate_script_from_template(channel: str, topic: str) -> Dict[str, Any]:
     return {"scenes": scenes}
 
 
+def _normalise_evidence_script(script: Dict[str, Any]) -> Dict[str, Any]:
+    """Map the provider schema to the existing assembler's scene shape."""
+    scenes = []
+    for number, scene in enumerate(script["scenes"], start=1):
+        scenes.append({
+            "scene_number": number,
+            "description": scene["visual_query"],
+            "duration_seconds": scene["duration_seconds"],
+            "visual_cue": scene["visual_query"],
+            "voiceover_text": scene["narration"],
+            "on_screen_text": scene["on_screen_text"],
+        })
+    return {**script, "scenes": scenes}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate YouTube video script for a social media channel.")
     parser.add_argument("--channel", required=True, help="Channel key (e.g., soccer, christian, trading)")
     parser.add_argument("--topic", required=True, help="Topic for the video script")
     parser.add_argument("--output", help="Output file path for JSON script (if not provided, prints to stdout)")
+    parser.add_argument("--provider", choices=["template", "nvidia"], default="template",
+                        help="template is legacy; nvidia requires a source evidence pack")
+    parser.add_argument("--evidence-file", help="JSON evidence pack required for --provider nvidia")
     
     args = parser.parse_args()
     
     try:
-        script = generate_script(args.channel, args.topic)
+        if args.provider == "nvidia":
+            if args.channel != "christian":
+                raise ValueError("The evidence-first NVIDIA provider is currently configured for Faith Nexus only.")
+            if not args.evidence_file:
+                raise ValueError("--evidence-file is required for --provider nvidia.")
+            with open(args.evidence_file, encoding="utf-8") as evidence_handle:
+                evidence = json.load(evidence_handle)
+            script = _normalise_evidence_script(generate_faith_script(args.topic, evidence))
+        else:
+            script = generate_script(args.channel, args.topic)
         json_output = json.dumps(script, indent=2)
         
         if args.output:
