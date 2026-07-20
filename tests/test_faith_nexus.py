@@ -35,6 +35,17 @@ def test_caption_events_highlight_each_timed_word():
     assert [event["active"] for event in events] == [0, 1, 2]
 
 
+def test_caption_events_hold_through_tts_pauses_without_flashing():
+    events = _caption_groups({"words": [
+        {"text": "Peace", "start": 0.0, "end": 0.2},
+        {"text": "for", "start": 0.55, "end": 0.7},
+        {"text": "today", "start": 1.2, "end": 1.5},
+    ]})
+    assert events[0]["end"] == 0.55
+    assert events[1]["end"] == 1.2
+    assert events[0]["tokens"] == ["Peace", "for", "today"]
+
+
 def test_bundle_preflight_requires_all_review_inputs(tmp_path):
     storyboard = tmp_path / "storyboard.json"
     storyboard.write_text(STORYBOARD.read_text())

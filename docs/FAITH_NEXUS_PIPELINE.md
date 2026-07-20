@@ -11,7 +11,22 @@ use a separately recorded licence manifest if replacing it with external music.
 
 `caption_style` belongs in each storyboard. Set `accent_hex` and `caption_hex`
 per video to match its emotional palette; gold is only the warm-dawn default,
-not a channel-wide brand requirement.
+not a channel-wide brand requirement. Captions are uppercase, large, and black
+outlined. A five-word phrase stays continuously visible between spoken words;
+only the active word changes to the palette accent, preventing a blinking or
+flashing subtitle effect.
+
+## Workflow references adopted deliberately
+
+[MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) usefully
+reinforces configurable vertical output, material pacing, caption styling, and
+gentle background-music control. smagent keeps the Scripture-first storyboard,
+provenance checks, and review-only publishing policy rather than adopting its
+generic auto-video path. [WhisperX](https://github.com/m-bain/whisperX) is the
+optional post-TTS verification route: its forced alignment can validate
+word-level caption timing on a capable GPU worker. Edge TTS boundaries remain
+the production timing source, so the pipeline works without a WhisperX runtime
+dependency on this Mac.
 
 ## Run the Matthew 6:34 candidate
 

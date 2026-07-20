@@ -46,15 +46,29 @@ def _audio_duration(path: Path) -> float:
 
 
 def _caption_groups(timings: dict[str, Any]) -> list[dict[str, Any]]:
+    """Keep a phrase visible continuously while its active word changes.
+
+    TTS word-boundary events commonly leave a small silence before the next
+    word.  Using each word's raw ``end`` made the whole caption disappear in
+    those gaps, which reads as an unwanted flash.  The current highlighted
+    word therefore holds until the following word begins; only its colour
+    changes, while the phrase itself remains stable.
+    """
     entries = timings.get("words", [])
     if not entries:
         raise ValueError("Word timing JSON has no words.")
     result: list[dict[str, Any]] = []
-    for start in range(0, len(entries), 4):
-        group = entries[start:start + 4]
+    group_size = 5
+    for start in range(0, len(entries), group_size):
+        group = entries[start:start + group_size]
         for active, item in enumerate(group):
+            absolute_index = start + active
+            next_start = (float(entries[absolute_index + 1]["start"])
+                          if absolute_index + 1 < len(entries)
+                          else float(item["end"]))
             result.append({"start": item["start"], "end": max(item["end"], item["start"] + 0.08),
                            "tokens": [word["text"] for word in group], "active": active})
+            result[-1]["end"] = max(float(result[-1]["end"]), next_start)
     return result
 
 
