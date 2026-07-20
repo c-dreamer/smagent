@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_ROOT = Path.home() / "Downloads" / "smagent_output"
+load_dotenv(ROOT.parents[1] / "human-ai.env2")
+OUTPUT_ROOT = Path(os.environ.get("SMAGENT_FAITH_NEXUS_WORKSPACE_DIR", str(Path.home() / "Downloads" / "smagent_output")))
 SETTINGS = ROOT / "dashboard" / "postiz.local.json"
 CHANNELS = {
     "soccer": {"name": "GoalHubPro", "handle": "@Goal_HubPro", "niche": "Soccer analysis and highlights"},

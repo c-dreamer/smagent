@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from faith_nexus import load_storyboard, words
 from pipeline.orchestrator import run_faith_nexus_storyboard
 
 ROOT = Path(__file__).resolve().parent
-OUTPUT = Path.home() / "Downloads" / "smagent_output" / "faith_nexus_remakes"
+load_dotenv(ROOT.parents[1] / "human-ai.env2")
+OUTPUT = Path(os.environ.get("SMAGENT_FAITH_NEXUS_WORKSPACE_DIR", str(Path.home() / "Downloads" / "smagent_output"))) / "faith_nexus_remakes"
 
 RECIPES = [
     {"slug": "proverbs_3_5_6", "title": "When You Cannot See the Road", "reference": "Proverbs 3:5–6", "source_url": "https://ebible.org/eng-web/PRO03.htm", "accent": "#78B6D8", "verse": "Trust in Yahweh with all your heart, and don’t lean on your own understanding. In all your ways acknowledge him, and he will make your paths straight.", "narration": "When you cannot see the road, it is tempting to trust what you can calculate. But understanding was not meant to carry answers. God invites you to rest your next step in him. Scripture says: “Trust in Yahweh with all your heart, and don’t lean on your own understanding. In all your ways acknowledge him, and he will make your paths straight.” Proverbs 3:5–6. You do not need a map tonight. Bring God the decision, the uncertainty, and the path ahead. Walk faithfully with the light you have. Jesus loves you, and stay blessed. Like and subscribe for more Christian content.", "mood": "cool blue dawn, winding path, quiet trust"},

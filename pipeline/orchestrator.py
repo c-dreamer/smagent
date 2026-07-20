@@ -9,6 +9,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 _PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
@@ -19,8 +21,9 @@ from pipeline import approval  # noqa: E402
 from channel_configs import get_channel_config  # noqa: E402
 from faith_nexus import load_storyboard  # noqa: E402
 
+load_dotenv(Path(__file__).resolve().parents[3] / "human-ai.env2")
 STAGES = ["script", "thumbnail", "voiceover", "metadata", "download_clips", "compile", "review"]
-DEFAULT_OUTPUT_DIR = str(Path.home() / "Downloads" / "smagent_output")
+DEFAULT_OUTPUT_DIR = os.environ.get("SMAGENT_FAITH_NEXUS_WORKSPACE_DIR", str(Path.home() / "Downloads" / "smagent_output"))
 
 
 def _now() -> str:
